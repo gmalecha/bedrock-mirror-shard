@@ -1,9 +1,11 @@
-Require Import Expr SepExpr.
-Require Import Prover SymEval.
-Require Import Env TypedPackage.
-Import List.
+Require Import List.
+Require Import MirrorShard.Expr MirrorShard.SepExpr.
+Require Import MirrorShard.Prover.
+Require Import MirrorShard.Env TypedPackage.
+
+Require Import SymEval.
 Require Import IL SepIL SymIL ILEnv.
-Require ReifyExpr ReifySepExpr ReifyHints.
+Require MirrorShard.ReifyExpr ReifySepExpr MirrorShard.ReifyHints.
 Require Unfolder.
 
 Set Implicit Arguments.

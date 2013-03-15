@@ -1,6 +1,6 @@
 Require Import List.
+Require Import MirrorShard.ReifyExpr.
 Require Import IL.
-Require Import ReifyExpr.
 Require Import SymIL.
 
 (* Reify the instructions *)
@@ -45,7 +45,7 @@ Ltac collectTypes_rvalue isConst r Ts k :=
   match r with
     | RvLval ?l => collectTypes_lvalue isConst l Ts k
     | RvImm ?i => ReifyExpr.collectTypes_expr isConst i Ts k
-    | RvLabel _ => let Ts := Reflect.cons_uniq label Ts in k Ts
+    | RvLabel _ => let Ts := MirrorShard.Reify.cons_uniq label Ts in k Ts
   end.
 
 Ltac reify_rvalue isConst r types funcs uvars vars k :=

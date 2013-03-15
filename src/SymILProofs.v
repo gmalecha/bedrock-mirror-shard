@@ -1,16 +1,15 @@
 (** This file implements symbolic evaluation for the
  ** language defined in IL.v
  **)
+Require Import List.
+Require Import MirrorShard.EqdepClass.
+Require Import MirrorShard.SepExpr.
+Require Import MirrorShard.Expr.
+Require Import MirrorShard.Prover.
+Require Import MirrorShard.Env TypedPackage.
 Require Import IL SepIL.
 Require Import Word Memory.
-Require Import DepList EqdepClass.
 Require Import PropX.
-Require Import SepExpr SymEval.
-Require Import Expr.
-Require Import Prover.
-Require Import Env TypedPackage.
-Import List.
-
 Require Structured SymEval.
 Require Import ILEnv SymIL.
 
@@ -34,13 +33,14 @@ Module SymIL_Correct.
 
     Variable fs : functions types.
     Let funcs := repr (bedrock_funcs_r ts) fs.
-    Variable preds : SEP.predicates types pcT stT.
+    Variable preds : SEP.predicates types.
 
     Variable Prover : ProverT types.
     Variable PC : ProverT_correct Prover funcs.
 
-    Variable meval : MEVAL.MemEvaluator types pcT stT.
-    Variable meval_correct : MEVAL.MemEvaluator_correct meval funcs preds tvWord tvWord
+    Variable meval : MEVAL.MemEvaluator types.
+    Check MEVAL.MemEvaluator_correct.
+    Variable meval_correct : MEVAL.MemEvaluator_correct pcT stT meval funcs preds tvWord tvWord
       (@IL_mem_satisfies ts) (@IL_ReadWord ts) (@IL_WriteWord ts) (@IL_ReadByte ts) (@IL_WriteByte ts).
 
     Variable facts : Facts Prover.
@@ -147,7 +147,7 @@ Module SymIL_Correct.
         end.
         simpl in *.
         destruct (WriteWord s0 (Mem s1) (evalLoc s1 l) valD); try contradiction. t_correct.
-        Transparent stateD. destruct ss; destruct SymRegs; destruct p. simpl in *. Opaque stateD. intuition. subst.
+        Transparent stateD. destruct ss; destruct SymRegs; destruct p. simpl in *. Opaque stateD. intuition. subst.        
         generalize SH.sheapD_pures. unfold SEP.ST.satisfies. intro XXX. 
         rewrite sepFormula_eq in H3. unfold sepFormula_def in H3. simpl in *.
         specialize (@XXX _ _ _ funcs preds meta_env vars_env cs _ _ _ H3). 

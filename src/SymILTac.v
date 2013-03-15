@@ -1,16 +1,16 @@
 (** This file implements the tactics for symbolic evaluation for the
  ** language defined in IL.v
  **)
+Require Import List.
+Require Import MirrorShard.Tactics MirrorShard.Reflection.
+Require Import MirrorShard.SepExpr SymEval.
+Require Import MirrorShard.Expr MirrorShard.ReifyExpr.
+Require Import MirrorShard.Prover.
+Require Import MirrorShard.Env MirrorShard.TypedPackage.
+Require MirrorShard.Folds.
 Require Import IL SepIL SymIL SymILProofs.
 Require Import Word Memory.
-Require Import DepList EqdepClass.
 Require Import PropX.
-Require Import SepExpr SymEval.
-Require Import Expr ReifyExpr.
-Require Import Prover.
-Require Import Env TypedPackage.
-Import List Tactics Reflection.
-Require Folds.
 Require Import TacPackIL.
 
 Require Structured SymEval.

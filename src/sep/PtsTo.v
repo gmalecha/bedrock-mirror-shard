@@ -1,8 +1,9 @@
-Require Import DepList List.
-Require Import Expr SepExpr SymEval.
+Require Import List.
+Require Import MirrorShard.Expr MirrorShard.SepExpr.
+Require Import MirrorShard.Reflection.
+Require Import MirrorShard.Prover.
+Require Import SymEval.
 Require Import Memory SepIL SymIL.
-Require Import Prover.
-Require Import Reflection.
 
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -66,16 +67,16 @@ Module BedrockPtsToEvaluator.
     Local Notation "'wordT'" := (tvType 0).
     Local Notation "'ptrT'" := (tvType 0).
 
-    Definition ptsto32_ssig : SEP.predicate types pcT stT.
-    refine (SEP.PSig _ _ _ (ptrT :: wordT :: nil) _).
+    Definition ptsto32_ssig : SEP.predicate types.
+    refine (SEP.PSig _ (ptrT :: wordT :: nil) _).
     refine (ptsto32 _).
     Defined.
 
-    Definition ptsto32_ssig_r : Env.Repr (SEP.predicate types pcT stT) :=
+    Definition ptsto32_ssig_r : Env.Repr (SEP.predicate types) :=
       Eval cbv beta iota zeta delta [ Env.listToRepr ] in 
       let lst := 
         ptsto32_ssig :: nil
-      in Env.listToRepr lst (SEP.Default_predicate _ _ _).
+      in Env.listToRepr lst (SEP.Default_predicate _).
 
     Variable funcs : functions types.
     Variable Prover : ProverT types.

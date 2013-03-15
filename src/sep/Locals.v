@@ -1,8 +1,11 @@
 Require Import Ascii Bool String List.
-Require Import Word Memory Expr SepExpr SymEval SepIL Env Prover SymEval IL SymIL.
+Require Import Word Memory SepExpr SymEval SepIL Env Prover SymEval IL SymIL.
 Require Import sep.Array.
 Require Import Allocated.
 Require Import ListFacts.
+
+Require Import MirrorShard.Expr.
+
 
 Set Implicit Arguments.
 

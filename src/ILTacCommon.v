@@ -1,14 +1,14 @@
+Require Import List.
+Require Import MirrorShard.DepList.
+Require Import MirrorShard.Expr MirrorShard.SepExpr MirrorShard.SepCancel.
+Require Import MirrorShard.Prover.
+Require Import MirrorShard.Tactics MirrorShard.Reflection.
+Require Import MirrorShard.ExprUnify.
+
+Require Import PropX.
+Require Import TacPackIL ILEnv.
 Require Import IL SepIL.
 Require Import Word Memory.
-Import List.
-Require Import DepList EqdepClass.
-Require Import PropX.
-Require Import Expr SepExpr SepCancel.
-Require Import Prover ILEnv.
-Require Import Tactics Reflection.
-Require Import TacPackIL.
-Require ExprUnify.
-
 Require Import SymILTac CancelIL.
 
 Set Implicit Arguments.

@@ -1,6 +1,6 @@
+Require Import List.
 Require Import IL SepIL.
 Require Import Word Memory.
-Import List.
 Require Import DepList EqdepClass.
 Require Import PropX.
 Require Import Expr SepExpr SepCancel.

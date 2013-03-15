@@ -1,4 +1,4 @@
-Require Import Reflection.
+Require Import MirrorShard.Reflection.
 Require Import Bool.
 
 Ltac think' ext solver :=

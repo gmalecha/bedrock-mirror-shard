@@ -1,6 +1,6 @@
 Require Import List.
 
-Require ReifySepExpr.
+Require MirrorShard.ReifySepExpr.
 Require Import ILTacCommon.
 Require Import SepIL.
 Require Import TacPackIL.

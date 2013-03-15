@@ -1,5 +1,8 @@
 Require Import Arith NArith Eqdep_dec List.
-Require Import Nomega Word Memory PropX PropXTac IL DepList Heaps SepTheoryXIL.
+Require Import MirrorShard.Heaps.
+Require Import MirrorShard.DepList.
+Require Import MirrorShard.MultiMem.
+Require Import Nomega Word Memory PropX PropXTac IL SepTheoryPropX.
 
 Set Implicit Arguments.
 
@@ -117,8 +120,9 @@ Theorem NoDup_allWords : forall width,
   rewrite allWords_eq; intros; apply NoDup_allWordsUpto; omega.
 Qed.
 
-Module BedrockHeap.
+Module BedrockHeap <: Memory.
   Definition addr := W.
+  Definition value := B.
 
   Definition mem := mem.
 
@@ -162,16 +166,25 @@ Module BedrockHeap.
     destruct (weq p p); auto. congruence.
   Qed.
     
-  Theorem mem_get_set_neq : forall m p p' v' m', 
-    p <> p' ->
-    mem_set m p' v' = Some m' ->
-    mem_get m' p = mem_get m p.
+  Theorem mem_get_set_neq : forall m p v m', 
+    mem_set m p v = Some m' ->
+    forall p', p <> p' -> 
+      mem_get m' p' = mem_get m p'.
   Proof.
     unfold mem_set, mem_get, ReadByte, WriteByte; intros.
-    destruct (m p'); try congruence.
-    inversion H0; clear H0; subst.
-    destruct (weq p p'); auto. congruence.
+    destruct (m p); try congruence.
+    inversion H; clear H; subst.
+    destruct (weq p' p); auto. congruence.
   Qed.
+
+  Theorem mem_get_mem_set : forall m p,
+    mem_get m p <> None -> forall v, mem_set m p v <> None.
+  Proof.
+    unfold mem_set, mem_get, ReadByte, WriteByte; intros.
+    destruct (m p); try congruence.
+  Qed.
+
+  Definition addr_dec := @weq 32.
 
   (** mem writes don't modify permissions **)
   Theorem mem_set_perm : forall m p v m',
@@ -201,7 +214,7 @@ Module BedrockHeap.
     repeat split; W_neq.
   Qed.
 
-  Definition addr_dec := @weq 32.
+
 
   Definition all_addr := allWords 32.
 
@@ -210,46 +223,64 @@ Module BedrockHeap.
   Qed.
 End BedrockHeap.
 
-Module ST := SepTheoryXIL.Make (BedrockHeap).
+Module BedrockPcSt <: PcSt.
+  Definition pcType := W.
+  Definition stateType := prod IL.settings state.
+End BedrockPcSt.
+
+Require MirrorShard.DiscreteMemory.
+Module SM := MirrorShard.DiscreteMemory.DiscreteHeap BedrockHeap BedrockHeap.
+Module STK := SepTheoryPropX.SepTheoryPropX_Kernel SM BedrockPcSt.
+Module ST := SepTheory.SepTheory_From_Kernel STK.
 Import ST.
 Export ST.
-Import ST.HT.
-Export ST.HT.
-
+Import SM.
+Export SM.
+Module MSMF := MultiSepMemFacts SM.
 
 (** * Define some convenient connectives, etc. for specs *)
 
 Definition memoryIn : mem -> smem := memoryIn.
 
-Definition hpropB := hprop W (settings * state).
+Definition hpropB sos := STK.ihprop sos. 
 Definition HProp := hpropB nil.
 
-Definition empB sos : hpropB sos := emp _ _.
+Definition empB sos : hpropB sos := STK.iemp _.
 Notation "'Emp'" := (empB _) : Sep_scope.
 
-Definition injB sos (P : Prop) : hpropB sos := inj (Inj P).
+Definition injB sos (P : Prop) : hpropB sos := STK.iinj sos P.
 
 Notation "[| P |]" := (injB _ P) : Sep_scope.
 
-Definition injBX sos (P : propX W (settings * state) sos) : hpropB sos := inj P.
+Definition injBX sos (P : propX W (settings * state) sos) : hpropB sos := STK.iinjX P.
 
 Notation "[|| P ||]" := (injBX P) : Sep_scope.
 
-Definition ptsto8 sos : W -> B -> hpropB sos :=
-  hptsto W (settings * state) sos.
+Definition ptsto8 sos : W -> B -> hpropB sos := STK.ihptsto sos.
 
 Notation "a =8> v" := (ptsto8 _ a v) (no associativity, at level 39) : Sep_scope.
 
+Definition smem_read_word (stn : IL.settings) (p : W) (sm : smem) : option W :=
+  multi_read 4
+    (fun a => let '(a,b,c,d) := footprint_w a in (a,(b,(c,(d,tt)))))
+    (fun v => let '(a,(b,(c,(d,_)))) := v in implode stn (a,b,c,d))
+    smem_get p sm.
+
+Definition smem_write_word (stn : IL.settings) (p : W) (v : W) (sm : smem) : option smem :=
+  multi_write 4
+    (fun a => let '(a,b,c,d) := footprint_w a in (a,(b,(c,(d,tt)))))
+    (fun v => let '(a,b,c,d) := explode stn v in (a,(b,(c,(d,tt)))))
+    smem_set p v sm.
+
 (* This breaks the hprop abstraction because it needs access to 'settings' *)
 Definition ptsto32 sos (a v : W) : hpropB sos :=
-  (fun stn sm => [| ST.HT.smem_get_word (implode stn) a sm = Some v
+  (fun stn sm => [| smem_read_word stn a sm = Some v
     /\ forall a', a' <> a /\ a' <> (a ^+ $1) /\ a' <> (a ^+ $2) /\ a' <> (a ^+ $3)
-      -> ST.HT.smem_get a' sm = None |])%PropX.
+      -> SM.smem_get a' sm = None |])%PropX.
 
 Notation "a =*> v" := (ptsto32 _ a v) (no associativity, at level 39) : Sep_scope.
 
-Definition starB sos : hpropB sos -> hpropB sos -> hpropB sos :=
-  @star W (settings * state) sos.
+Definition starB sos : hpropB sos -> hpropB sos -> hpropB sos := @STK.istar sos.
 
 Infix "*" := starB : Sep_scope.
 
@@ -270,7 +301,7 @@ Fixpoint ptsto32m sos (a : W) (offset : nat) (vs : list W) : hpropB sos :=
 
 Notation "a ==*> v1 , .. , vn" := (ptsto32m _ a O (cons v1 .. (cons vn nil) ..)) (no associativity, at level 39) : Sep_scope.
 
-Definition exB sos T (p : T -> hpropB sos) : hpropB sos := ex p.
+Definition exB sos T (p : T -> hpropB sos) : hpropB sos := STK.iex p.
 
 Notation "'Ex' x , p" := (exB (fun x => p)) : Sep_scope.
 Notation "'Ex' x : A , p" := (exB (fun x : A => p)) : Sep_scope.
@@ -304,7 +335,7 @@ Fixpoint lift sos (p : HProp) : hpropB sos :=
 Notation "^[ p ]" := (lift _ p) : Sep_scope.
 
 Definition Himp (p1 p2 : HProp) : Prop :=
-  forall specs, ST.himp specs p1 p2.
+  STK.himp p1 p2.
 
 Notation "p1 ===> p2" := (Himp p1%Sep p2%Sep) (no associativity, at level 90).
 
@@ -331,7 +362,7 @@ Import SepFormula.
 Require Import RelationClasses Setoid.
 
 Global Add Parametric Morphism cs : (@sepFormula nil) with
-  signature (@himp W (settings * state) cs ==> @eq (settings * state) ==> @PropXRel.PropX_imply _ _ cs)
+  signature (himp ==> @eq (settings * state) ==> @PropXRel.PropX_imply _ _ cs)
 as sepFormula_himp_imply.
   unfold himp. rewrite sepFormula_eq.
   unfold sepFormula_def.
@@ -339,12 +370,12 @@ as sepFormula_himp_imply.
   intros. unfold interp.
   eapply PropX.Imply_I. 
 
-  specialize (H (fst y0) (memoryIn (Mem (snd y0)))). eapply PropX.Imply_E.
+  specialize (H cs (fst y0) (memoryIn (Mem (snd y0)))). eapply PropX.Imply_E.
   eapply PropXTac.valid_weaken. eapply H. firstorder.
   PropXRel.propxIntuition.
 Qed.
 Global Add Parametric Morphism cs : (@sepFormula nil) with
-  signature (@heq W (settings * state) cs ==> @eq (settings * state) ==> @PropXRel.PropX_eq _ _ cs)
+  signature (heq ==> @eq (settings * state) ==> @PropXRel.PropX_eq _ _ cs)
 as sepFormula_himp_eq.
   rewrite sepFormula_eq. unfold heq, himp, sepFormula_def, PropXRel.PropX_eq, PropXRel.PropX_imply.
   intros. unfold interp in *. intuition; PropXRel.propxIntuition; eauto.
@@ -480,7 +511,7 @@ Definition natToByte (n : nat) : B := natToWord _ n.
 Coercion natToByte : nat >-> B.
 
 (* *)
-Require SepExpr SepHeap.
+Require MirrorShard.SepExpr MirrorShard.SepHeap.
 Module SEP := SepExpr.Make ST.
 Module SH := SepHeap.Make SEP.
 
@@ -521,8 +552,8 @@ Qed.
 
 Lemma himp_star_frame_comm :
   forall (pcType stateType : Type) (cs : codeSpec pcType stateType)
-    (P Q R S : hprop pcType stateType nil),
-    himp cs P Q -> himp cs R S -> himp cs (star P R) (star S Q).
+    (P Q R S : hprop),
+    himp P Q -> himp R S -> himp (star P R) (star S Q).
   intros; eapply Trans_himp; [ | apply himp_star_comm ].
   apply himp_star_frame; auto.
 Qed.

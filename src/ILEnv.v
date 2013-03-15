@@ -1,11 +1,11 @@
 (** This file contains generic environment information for the Bedrock IL
  **)
 Require Import List.
+Require Import MirrorShard.Expr.
+Require Import MirrorShard.Env.
+Require Import MirrorShard.TypedPackage.
 Require Import Word.
-Require Import Expr.
-Require Import Env.
 Require Import Memory IL.
-Require Import TypedPackage.
 Require Import Arith.
 
 

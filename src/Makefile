@@ -1,20 +1,18 @@
-PROVERS := Assumption Reflexivity Word
+PROVERS = Word Locals ArrayBound
+# SEP = PtsTo Array Array8 
 #  Transitivity
-MODULES    := Reflection Tactics ListFacts \
-	GenRec Ordering Multimap Folds \
+MODULES    := Tactics ListFacts \
 	Nomega Word Labels LabelMap StringSet \
 	PropX PropXRel PropXTac \
 	Memory \
 	XCAP Structured StructuredModule Linker Programming \
-	EqdepClass Decidables DepList Reflect \
-	Heaps SepTheoryX SepTheoryXIL \
-	NatMap Expr ReifyExpr ExprUnify \
-	Prover Provers \
+	SepTheoryPropX \
+	NatMap \
+	Provers \
 	$(PROVERS:%=provers/%Prover) \
-	SepExpr ReifySepExpr SepHeap SepUnify SepCancel \
-	Unfolder ReifyHints SepLemma \
-	Env TypedPackage TacPackIL Allocated \
-	SymEval sep/PtsTo sep/Array Arrays sep/Locals sep/Array8 provers/LocalsProver provers/ArrayBoundProver \
+	$(SEP:%=sep/%) \
+	TacPackIL Allocated \
+	SymEval Arrays \
 	IL ReifyIL \
 	ILEnv SepIL \
 	SymIL SymILProofs SymILTac \

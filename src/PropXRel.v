@@ -151,8 +151,10 @@ Ltac propxIntuition :=
                            end
                          | [ |- valid _ _ (_ /\ _)%PropX ] =>
                            eapply And_I
+(*
                          | [ |- valid _ _ (Ex x : _ , _)%PropX ] =>
                            eapply Exists_I
+*)
                          | [ |- valid _ _ (?X _ _) ] =>
                            match X with
                              | @Inj _ _ => fail 1
@@ -174,4 +176,3 @@ Section more.
     (eapply Imply_E; [ eapply valid_weaken; eauto; firstorder | econstructor; firstorder ]). 
   Qed.
 End more.
-    

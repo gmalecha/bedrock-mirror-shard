@@ -1,8 +1,8 @@
 Require Import List Arith Bool.
-Require Import Expr Env.
-Require Import EquivDec EqdepClass.
-Require Import DepList.
-Require Import Word Prover.
+Require Import MirrorShard.Expr MirrorShard.Env.
+Require Import MirrorShard.EqdepClass.
+Require Import MirrorShard.DepList MirrorShard.Prover.
+Require Import Word.
 
 Set Implicit Arguments.
 Set Strict Implicit.

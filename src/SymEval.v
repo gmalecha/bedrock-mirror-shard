@@ -1,199 +1,22 @@
 Require Import List DepList Word Memory.
-Require Import Heaps SepTheoryX.
-Require Import Expr SepHeap.
-Require Import Prover.
 Require Import PropX.
 Require Import Env.
 
+Require Import MirrorShard.Expr.
+Require Import MirrorShard.SepTheory.
+Require Import MirrorShard.SepHeap.
+Require Import MirrorShard.Quantifier.
+Require Import MirrorShard.Prover.
+
 Set Implicit Arguments.
 Set Strict Implicit.
-
-Section over_types.
-  Variable types : list type.
-
-  Inductive Quant : Type := 
-  | QAll  : variables -> Quant -> Quant
-  | QEx   : variables -> Quant -> Quant
-  | QBase : Quant.
-
-  (** NOTE: the top-most quantifier should be the deepest quantifier **)
-  (** NOTE: for forward reasoning we want to invert the quantifiers, i.e. All should become uvar and ex should become var *)
-  Fixpoint quantD (ex_env all_env : env types) (qs : Quant) (k : env types -> env types -> Prop) : Prop :=
-    match qs with
-      | QBase => k ex_env all_env
-      | QAll vs qs => quantD ex_env all_env qs (fun ex_env all_env => forallEach vs (fun all_ext => k ex_env (all_env ++ all_ext)))
-      | QEx vs qs => quantD ex_env all_env qs (fun ex_env all_env => existsEach vs (fun ex_ext => k (ex_env ++ ex_ext) all_env))
-    end.
-
-  Fixpoint appendQ (q1 q2 : Quant) : Quant :=
-    match q1 with 
-      | QBase => q2
-      | QAll vs q1 => QAll vs (appendQ q1 q2)
-      | QEx vs q1 => QEx vs (appendQ q1 q2)
-    end.
-
-  Theorem quantD_app : forall qs' qs meta_env vars_env k, 
-    quantD meta_env vars_env (appendQ qs qs') k <->
-    quantD meta_env vars_env qs' (fun meta_env vars_env => quantD meta_env vars_env qs k).
-  Proof.
-    clear; induction qs; simpl; intros; try rewrite IHqs; try reflexivity.
-  Qed.
-
-  Fixpoint gatherEx (qs : Quant) : variables :=
-    match qs with
-      | QBase => nil
-      | QAll _ qs => gatherEx qs
-      | QEx vs qs => gatherEx qs ++ vs
-    end.
-
-  Fixpoint gatherAll (qs : Quant) : variables :=
-    match qs with
-      | QBase => nil
-      | QAll vs qs => gatherAll qs ++ vs
-      | QEx _ qs => gatherAll qs
-    end.
-
-  Theorem quantD_impl : forall qs meta_env vars_env (k k' : _ -> _ -> Prop),
-    quantD meta_env vars_env qs k ->
-    (forall a b,
-      typeof_env a = gatherEx qs -> 
-      typeof_env b = gatherAll qs -> 
-      k (meta_env ++ a) (vars_env ++ b) ->
-      k' (meta_env ++ a) (vars_env ++ b)) ->
-    quantD meta_env vars_env qs k'.
-  Proof.
-    clear. induction qs; simpl; intros; try (eapply IHqs; [ eauto | ]); simpl in *; intros; instantiate; simpl in *;
-    repeat match goal with 
-             | [ |- existsEach _ _ ] => eapply existsEach_sem
-             | [ |- forallEach _ _ ] => eapply forallEach_sem; intros
-             | [ H : existsEach _ _ |- _ ] =>
-               eapply existsEach_sem in H; destruct H
-             | [ H : forallEach _ _ |- _ ] =>
-               eapply forallEach_sem in H; [ | solve [ eauto ] ]
-             | [ H : _ /\ _ |- _ ] => destruct H
-             | [ |- exists x, _ /\ _ ] =>
-               eexists; split; [ solve [ eauto ] | ]                   
-             | [ |- _ ] => rewrite app_ass in *
-           end.
-    { eapply H0; eauto. subst. rewrite <- H2. unfold typeof_env. rewrite map_app. auto. }
-    { eapply H0; eauto. subst. rewrite <- H1. unfold typeof_env. rewrite map_app. auto. }
-    { specialize (H0 nil nil). repeat rewrite app_nil_r in *. auto. }
-  Qed.
-
-  Require Import Tactics.
-
-  Theorem gatherEx_appendQ : forall q1 q2, 
-    gatherEx (appendQ q1 q2) = gatherEx q2 ++ gatherEx q1.
-  Proof.
-    induction q1; simpl; intros; think; repeat (rewrite app_nil_r || rewrite app_ass); auto.
-  Qed.
-
-  Theorem gatherAll_appendQ : forall q1 q2, 
-    gatherAll (appendQ q1 q2) = gatherAll q2 ++ gatherAll q1.
-  Proof.
-    induction q1; simpl; intros; think; repeat (rewrite app_nil_r || rewrite app_ass); auto.
-  Qed.
-
-  Definition qex (ls : list tvar) (q : Quant) : Quant :=
-    match ls with
-      | nil => q
-      | _ => QEx ls q
-    end.
-
-  Definition qall (ls : list tvar) (q : Quant) : Quant :=
-    match ls with
-      | nil => q
-      | _ => QAll ls q
-    end.
-
-  Lemma quantD_qex_QEx : forall U G a b P,
-    quantD U G (QEx a b) P <-> quantD U G (qex a b) P.
-  Proof. clear.
-    destruct a; simpl in *; split; intros; auto.
-    { eapply quantD_impl; eauto; intros. simpl in *. rewrite app_nil_r in *. auto. }
-    { eapply quantD_impl; eauto; intros. simpl in *. rewrite app_nil_r in *. auto. }
-  Qed.
-
-  Lemma quantD_qall_QAll : forall U G a b P,
-    quantD U G (QAll a b) P <-> quantD U G (qall a b) P.
-  Proof. clear.
-    destruct a; simpl in *; split; intros; auto.
-    { eapply quantD_impl; eauto; intros. simpl in *. rewrite app_nil_r in *. auto. }
-    { eapply quantD_impl; eauto; intros. simpl in *. rewrite app_nil_r in *. auto. }
-  Qed.
-
-  Lemma appendQ_assoc : forall a b c,
-    appendQ (appendQ a b) c = appendQ a (appendQ b c).
-  Proof.
-    clear. induction a; simpl; intros; try f_equal; eauto.
-  Qed.
-
-  Lemma appendQ_QAll : forall a b v,
-    appendQ a (QAll v b) = appendQ (appendQ a (QAll v QBase)) b.
-  Proof. clear.
-    induction a; simpl; intros; try rewrite IHa; eauto.
-  Qed.
-  Lemma appendQ_QEx : forall a b v,
-    appendQ a (QEx v b) = appendQ (appendQ a (QEx v QBase)) b.
-  Proof. clear.
-    induction a; simpl; intros; try rewrite IHa; eauto.
-  Qed.
-
-  Lemma QAll_inj_False : forall a b,
-    QAll a b = b -> False.
-  Proof. clear.
-    induction b; simpl; intros; try congruence; auto.
-  Qed.
-
-  Lemma QEx_inj_False : forall a b,
-    QEx a b = b -> False.
-  Proof. clear.
-    induction b; simpl; intros; try congruence; auto.
-  Qed.
-
-  Fixpoint qsize (q : Quant) : nat :=
-    match q with
-      | QBase => 0
-      | QAll _ q              
-      | QEx _ q => S (qsize q)
-    end.
-
-  Lemma qsize_appendQ : forall a b,
-    qsize (appendQ a b) = qsize a + qsize b.
-  Proof.
-    clear; induction a; simpl in *; auto.
-  Qed.
-
-  Ltac apply_eq f H :=
-    match type of H with
-      | ?X = ?Y =>
-        assert (f X = f Y); [ f_equal; apply H | ] 
-    end.
-
-  Lemma appendQ_proper : forall a b c,
-    appendQ a b = appendQ c b ->
-    a = c.
-  Proof.
-    clear. induction a; destruct c; simpl; intros; try congruence;
-    repeat match goal with
-             | [ H : QAll _ _ = QAll _ _ |- _ ] => inversion H; clear H; subst
-             | [ H : QEx _ _ = QEx _ _ |- _ ] => inversion H; clear H; subst
-           end; try solve [ f_equal; eauto ]; exfalso.
-    { apply_eq qsize H. simpl in *; rewrite qsize_appendQ in H0. omega. }
-    { apply_eq qsize H. simpl in *; rewrite qsize_appendQ in H0. omega. }
-    { apply_eq qsize H. simpl in *; rewrite qsize_appendQ in H0. omega. }
-    { apply_eq qsize H. simpl in *; rewrite qsize_appendQ in H0. omega. }
-  Qed.
-
-End over_types.
-
 
 Module SymbolicEvaluator (SH : SepHeap).
   Module SEP := SH.SE.
   Module ST := SEP.ST.
 
   (** Learn hook
-   ** - This is the bit of code that gets run with new pure facts are
+   ** - This is the bit of code that gets run when new pure facts are
    **   learned during symbolic evaluation
    **)
   Section LearnHook.
@@ -209,7 +32,7 @@ Module SymbolicEvaluator (SH : SepHeap).
       (stateD : env types_ -> env types_ -> 
         codeSpec (tvarD types_ pcT) (tvarD types_ stT) -> tvarD types_ stT -> SymState -> Prop)
       (funcs : functions types_) 
-      (preds : SEP.predicates types_ pcT stT) : Prop :=
+      (preds : SEP.predicates types_) : Prop :=
     { hook_sound : forall P (PC : ProverT_correct P funcs),
       forall uvars vars cs stn_st ss ss' pp new_facts quant,
         stateD uvars vars cs stn_st ss ->
@@ -239,30 +62,30 @@ Module SymbolicEvaluator (SH : SepHeap).
    **)
   Section MemEvaluator.
     Variable types : list type.
-    Variables pcT stT : tvar.
+    Variables pcT stT : tvar. (** TODO: maybe we can get rid of this? **)
 
     Record MemEvaluator : Type :=
     { sread_word : forall (P : ProverT types), Facts P -> 
-      expr types -> SH.SHeap types pcT stT -> option (expr types)
+      expr types -> SH.SHeap types -> option (expr types)
     ; swrite_word : forall (P : ProverT types), Facts P ->
-      expr types -> expr types -> SH.SHeap types pcT stT -> option (SH.SHeap types pcT stT)
+      expr types -> expr types -> SH.SHeap types -> option (SH.SHeap types)
 
     ; sread_byte : forall (P : ProverT types), Facts P -> 
-      expr types -> SH.SHeap types pcT stT -> option (expr types)
+      expr types -> SH.SHeap types -> option (expr types)
     ; swrite_byte : forall (P : ProverT types), Facts P ->
-      expr types -> expr types -> SH.SHeap types pcT stT -> option (SH.SHeap types pcT stT)
+      expr types -> expr types -> SH.SHeap types -> option (SH.SHeap types)
     }.
 
     Variable eval : MemEvaluator.
 
     Variable funcs : functions types.
-    Variable preds : SEP.predicates types pcT stT.
+    Variable preds : SEP.predicates types.
 
     Variable stn_st : Type.
     
     Variables ptrT valT : tvar.
 
-    Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop (tvarD types pcT) (tvarD types stT) nil -> stn_st -> Prop.
+    Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop -> stn_st -> Prop.
     Hypothesis ReadWord : stn_st -> tvarD types ptrT -> option (tvarD types valT).
     Hypothesis WriteWord : stn_st -> tvarD types ptrT -> tvarD types valT -> option stn_st.
     Hypothesis ReadByte : stn_st -> tvarD types ptrT -> option (tvarD types valT).
@@ -331,7 +154,7 @@ Module SymbolicEvaluator (SH : SepHeap).
 
   Record MemEvaluatorPackage (tr : Repr type) (pc st ptr val : tvar) 
     (sat : forall ts, codeSpec (tvarD (repr tr ts) pc) (tvarD (repr tr ts) st) -> 
-      ST.hprop (tvarD (repr tr ts) pc) (tvarD (repr tr ts) st) nil -> tvarD (repr tr ts) st -> Prop) 
+      ST.hprop -> tvarD (repr tr ts) st -> Prop) 
     (read  : forall ts, tvarD (repr tr ts) st -> tvarD (repr tr ts) ptr -> option (tvarD (repr tr ts) val))
     (write : forall ts, tvarD (repr tr ts) st -> tvarD (repr tr ts) ptr -> tvarD (repr tr ts) val -> option (tvarD (repr tr ts) st))
     (readByte  : forall ts, tvarD (repr tr ts) st -> tvarD (repr tr ts) ptr -> option (tvarD (repr tr ts) val))
@@ -339,8 +162,8 @@ Module SymbolicEvaluator (SH : SepHeap).
     : Type :=
   { MemEvalTypes : Repr type
   ; MemEvalFuncs : forall ts, Repr (signature (repr tr (repr MemEvalTypes ts)))
-  ; MemEvalPreds : forall ts, Repr (SEP.predicate (repr tr (repr MemEvalTypes ts)) pc st)
-  ; MemEval : forall ts, MemEvaluator (repr tr (repr MemEvalTypes ts)) pc st
+  ; MemEvalPreds : forall ts, Repr (SEP.predicate (repr tr (repr MemEvalTypes ts)))
+  ; MemEval : forall ts, MemEvaluator (repr tr (repr MemEvalTypes ts))
   ; MemEval_correct : forall ts fs ps, 
     @MemEvaluator_correct (repr tr (repr MemEvalTypes ts)) pc st (MemEval ts)
       (repr (MemEvalFuncs ts) fs) (repr (MemEvalPreds ts) ps)
@@ -356,16 +179,16 @@ Module SymbolicEvaluator (SH : SepHeap).
       Variable prover : ProverT types.
       
       Definition smemeval_read_word_default (_ : Facts prover) (_ : expr types)
-        (_ : SH.SHeap types pcT stT) : option (expr types) :=
+        (_ : SH.SHeap types) : option (expr types) :=
         None.
 
       Definition smemeval_write_word_default (_ : Facts prover)
-        (_ : expr types) (_ : expr types) (_ : SH.SHeap types pcT stT)
-        : option (SH.SHeap types pcT stT) :=
+        (_ : expr types) (_ : expr types) (_ : SH.SHeap types)
+        : option (SH.SHeap types) :=
         None.
     End with_prover.
 
-    Definition MemEvaluator_default types pcT stT : MemEvaluator types pcT stT.
+    Definition MemEvaluator_default types : MemEvaluator types.
       constructor.
       apply smemeval_read_word_default.
       apply smemeval_write_word_default.
@@ -374,12 +197,12 @@ Module SymbolicEvaluator (SH : SepHeap).
     Defined.
 
     Theorem MemEvaluator_default_correct types' (pcT stT : tvar) funcs preds X Y Z A B C D E :
-      @MemEvaluator_correct types' pcT stT (MemEvaluator_default types' pcT stT) funcs preds X Y Z A B C D E.
+      @MemEvaluator_correct types' pcT stT (MemEvaluator_default types') funcs preds X Y Z A B C D E.
       econstructor.
-      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; congruence.
-      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; congruence.
-      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; congruence.
-      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; congruence.
+      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; intros; exfalso; inversion H.
+      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; intros; exfalso; inversion H.
+      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; intros; exfalso; inversion H.
+      simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; intros; exfalso; inversion H.
     Qed.
 
     Ltac unfolder H :=
@@ -392,9 +215,9 @@ Module SymbolicEvaluator (SH : SepHeap).
     Definition package tr pcT stT ptr val X Y Z A B : @MemEvaluatorPackage tr pcT stT ptr val X Y Z A B :=
       {| MemEvalTypes := nil_Repr EmptySet_type
        ; MemEvalFuncs := fun ts => nil_Repr (Default_signature _)
-       ; MemEvalPreds := fun ts => nil_Repr (SEP.Default_predicate _ pcT stT)
-       ; MemEval := fun ts => MemEvaluator_default _ _ _
-       ; MemEval_correct := fun ts fs ps => MemEvaluator_default_correct _ _ _ _ _ _ _ _ _
+       ; MemEvalPreds := fun ts => nil_Repr (SEP.Default_predicate _)
+       ; MemEval := fun ts => MemEvaluator_default _
+       ; MemEval_correct := fun ts fs ps => MemEvaluator_default_correct _ _ _ _ _ _ _ _ _ _ _
        |}.
 
   End Default.
@@ -434,7 +257,7 @@ Module SymbolicEvaluator (SH : SepHeap).
       Variable stn_st : Type.
       Variables ptrT valT : tvar.
 
-      Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop (tvarD types pcT) (tvarD types stT) nil -> stn_st -> Prop.
+      Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop -> stn_st -> Prop.
       Hypothesis ReadWord : stn_st -> tvarD types ptrT -> option (tvarD types valT).
       Hypothesis WriteWord : stn_st -> tvarD types ptrT -> tvarD types valT -> option stn_st.
       Hypothesis ReadByte : stn_st -> tvarD types ptrT -> option (tvarD types valT).
@@ -442,7 +265,7 @@ Module SymbolicEvaluator (SH : SepHeap).
 
       Variable me : MemEvalPred.
 
-      Record MemEvalPred_correct (Predicate : SEP.predicate types pcT stT)
+      Record MemEvalPred_correct (Predicate : SEP.predicate types)
         (funcs : functions types) : Prop :=
       { sym_read_word_correct : forall P (PE : ProverT_correct P funcs),
         forall args uvars vars cs facts pe p ve stn_st Q,
@@ -597,15 +420,15 @@ Module SymbolicEvaluator (SH : SepHeap).
       Variable mep : MemEvalPred types.
       Variable predIndex : nat.
 
-      Definition MemEvalPred_to_MemEvaluator : MemEvaluator types pcT stT :=
-        {| sread_word := fun (P : ProverT types) (F : Facts P) (p : expr types) (h : SH.SHeap types pcT stT) =>
+      Definition MemEvalPred_to_MemEvaluator : MemEvaluator types :=
+        {| sread_word := fun (P : ProverT types) (F : Facts P) (p : expr types) (h : SH.SHeap types) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
              | Some argss => fold_args (fun args => @pred_read_word _ mep P F args p) argss
            end
-         ; swrite_word := fun (P : ProverT types) (F : Facts P) (p v : expr types) (h : SH.SHeap types pcT stT) =>
+         ; swrite_word := fun (P : ProverT types) (F : Facts P) (p v : expr types) (h : SH.SHeap types) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
@@ -621,14 +444,14 @@ Module SymbolicEvaluator (SH : SepHeap).
                end
            end
 
-         ; sread_byte := fun (P : ProverT types) (F : Facts P) (p : expr types) (h : SH.SHeap types pcT stT) =>
+         ; sread_byte := fun (P : ProverT types) (F : Facts P) (p : expr types) (h : SH.SHeap types) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
              | Some argss => fold_args (fun args => @pred_read_byte _ mep P F args p) argss
            end
-         ; swrite_byte := fun (P : ProverT types) (F : Facts P) (p v : expr types) (h : SH.SHeap types pcT stT) =>
+         ; swrite_byte := fun (P : ProverT types) (F : Facts P) (p v : expr types) (h : SH.SHeap types) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
@@ -647,19 +470,19 @@ Module SymbolicEvaluator (SH : SepHeap).
     
       (** Correctness **)
       Variable funcs : functions types.
-      Variable preds : SEP.predicates types pcT stT.
+      Variable preds : SEP.predicates types.
 
       Variable stn_st : Type.
     
       Variables ptrT valT : tvar.
 
-      Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop (tvarD types pcT) (tvarD types stT) nil -> stn_st -> Prop.
+      Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop -> stn_st -> Prop.
       Hypothesis ReadWord : stn_st -> tvarD types ptrT -> option (tvarD types valT).
       Hypothesis WriteWord : stn_st -> tvarD types ptrT -> tvarD types valT -> option stn_st.
       Hypothesis ReadByte : stn_st -> tvarD types ptrT -> option (tvarD types valT).
       Hypothesis WriteByte : stn_st -> tvarD types ptrT -> tvarD types valT -> option stn_st.
 
-      Variable pred : SEP.predicate types pcT stT.
+      Variable pred : SEP.predicate types.
       Hypothesis predAt : nth_error preds predIndex = Some pred.
       Hypothesis pred_correct :
         @MemEvalPred_correct types pcT stT stn_st ptrT valT mem_satisfies
@@ -676,11 +499,11 @@ Module SymbolicEvaluator (SH : SepHeap).
       (** This is all going to get put in a record **)
       Hypothesis mem_satisfies_himp : forall cs P Q stn_st,
         mem_satisfies cs P stn_st ->
-        ST.himp cs P Q ->
+        ST.himp P Q ->
         mem_satisfies cs Q stn_st.
       Hypothesis mem_satisfies_pure : forall cs p P stn_st,
         mem_satisfies cs (ST.star (ST.inj p) P) stn_st ->
-        interp cs p.
+        p.
 
       Lemma pull_single : forall cs uvars vars SH x x1 x0 stn_st,
         FM.find predIndex (SH.impures SH) = Some (x0 ++ x :: x1) ->
@@ -694,7 +517,7 @@ Module SymbolicEvaluator (SH : SepHeap).
               |}))))) stn_st.
       Proof.
         intros. 
-        assert (SEP.heq funcs preds uvars vars cs 
+        assert (SEP.heq funcs preds uvars vars
           (SH.sheapD SH) 
           (SEP.Star (SEP.Func predIndex x) 
             (SH.starred (SEP.Func predIndex) x0 (SH.starred (SEP.Func predIndex) x1
@@ -737,7 +560,7 @@ Module SymbolicEvaluator (SH : SepHeap).
           revert H. match goal with 
                        | [ |- context [ match ?X with | _ => _ end ] ] => case_eq X
                      end; intros; auto.
-          apply mem_satisfies_pure in H3. PropXTac.propxFo. }
+          apply mem_satisfies_pure in H3. red in H3. auto. }
 
         { intros. revert H.
           case_eq (FM.find predIndex (SH.impures SH)); try congruence.
@@ -780,8 +603,8 @@ Module SymbolicEvaluator (SH : SepHeap).
                      SH.other := SH.other SH |})))))).
           simpl. rewrite predAt. rewrite H4. eauto.
           match goal with
-            | [ |- ST.himp ?cs (SEP.sexprD ?F ?P ?U ?G ?L) (SEP.sexprD _ _ _ _ ?R) ] =>
-              change (SEP.himp F P U G cs L R)
+            | [ |- ST.himp (SEP.sexprD ?F ?P ?U ?G ?L) (SEP.sexprD _ _ _ _ ?R) ] =>
+              change (SEP.himp F P U G L R)
           end.
           apply SF.heq_himp. do 2 rewrite SH.starred_base.
           repeat rewrite SH.sheapD_def; simpl. symmetry.
@@ -796,7 +619,7 @@ Module SymbolicEvaluator (SH : SepHeap).
             | [ |- context [ match ?X with _ => _ end ] ] => 
               case_eq X
           end; intros; eauto.
-          apply mem_satisfies_pure in H5. PropXTac.propxFo. }
+          apply mem_satisfies_pure in H5. eapply H5. }
 
         { intros. revert H. case_eq (FM.find predIndex (SH.impures SH)); try congruence; intros.
           eapply fold_args_correct in H3. destruct H3. intuition.
@@ -816,7 +639,7 @@ Module SymbolicEvaluator (SH : SepHeap).
           revert H. match goal with 
                        | [ |- context [ match ?X with | _ => _ end ] ] => case_eq X
                      end; intros; auto.
-          apply mem_satisfies_pure in H3. PropXTac.propxFo. }
+          apply mem_satisfies_pure in H3. eapply H3. }
 
         { intros. revert H.
           case_eq (FM.find predIndex (SH.impures SH)); try congruence.
@@ -859,8 +682,8 @@ Module SymbolicEvaluator (SH : SepHeap).
                      SH.other := SH.other SH |})))))).
           simpl. rewrite predAt. rewrite H4. eauto.
           match goal with
-            | [ |- ST.himp ?cs (SEP.sexprD ?F ?P ?U ?G ?L) (SEP.sexprD _ _ _ _ ?R) ] =>
-              change (SEP.himp F P U G cs L R)
+            | [ |- ST.himp (SEP.sexprD ?F ?P ?U ?G ?L) (SEP.sexprD _ _ _ _ ?R) ] =>
+              change (SEP.himp F P U G L R)
           end.
           apply SF.heq_himp. do 2 rewrite SH.starred_base.
           repeat rewrite SH.sheapD_def; simpl. symmetry.
@@ -875,7 +698,7 @@ Module SymbolicEvaluator (SH : SepHeap).
             | [ |- context [ match ?X with _ => _ end ] ] => 
               case_eq X
           end; intros; eauto.
-          apply mem_satisfies_pure in H5. PropXTac.propxFo. }
+          apply mem_satisfies_pure in H5. eapply H5. }
       Qed.
           
     End To_MemEvaluator.
@@ -887,7 +710,7 @@ Module SymbolicEvaluator (SH : SepHeap).
       Variable types : list type.
       Variable pcT stT : tvar.
 
-      Definition MemEvaluator_composite (l r : MemEvaluator types pcT stT) : MemEvaluator types pcT stT :=
+      Definition MemEvaluator_composite (l r : MemEvaluator types) : MemEvaluator types :=
         {| sread_word := fun P f e h => 
            match sread_word l P f e h with
              | None => sread_word r P f e h
@@ -911,24 +734,24 @@ Module SymbolicEvaluator (SH : SepHeap).
            end
          |}.
 
-      Variables evalL evalR : MemEvaluator types pcT stT.
+      Variables evalL evalR : MemEvaluator types.
 
       Variable funcs : functions types.
-      Variable preds : SEP.predicates types pcT stT.
+      Variable preds : SEP.predicates types.
 
       Variable stn_st : Type.
     
       Variables ptrT valT : tvar.
 
-      Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop (tvarD types pcT) (tvarD types stT) nil -> stn_st -> Prop.
+      Hypothesis mem_satisfies : PropX.codeSpec (tvarD types pcT) (tvarD types stT) -> ST.hprop -> stn_st -> Prop.
       Hypothesis ReadWord : stn_st -> tvarD types ptrT -> option (tvarD types valT).
       Hypothesis WriteWord : stn_st -> tvarD types ptrT -> tvarD types valT -> option stn_st.
       Hypothesis ReadByte : stn_st -> tvarD types ptrT -> option (tvarD types valT).
       Hypothesis WriteByte : stn_st -> tvarD types ptrT -> tvarD types valT -> option stn_st.
 
-      Hypothesis Lcorr : MemEvaluator_correct evalL funcs preds ptrT valT
+      Hypothesis Lcorr : MemEvaluator_correct _ _ evalL funcs preds ptrT valT
         mem_satisfies ReadWord WriteWord ReadByte WriteByte.
-      Hypothesis Rcorr : MemEvaluator_correct evalR funcs preds ptrT valT
+      Hypothesis Rcorr : MemEvaluator_correct _ _ evalR funcs preds ptrT valT
         mem_satisfies ReadWord WriteWord ReadByte WriteByte.
 
       Theorem MemEvaluator_correct_composite : @MemEvaluator_correct types pcT stT (MemEvaluator_composite evalL evalR)

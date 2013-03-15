@@ -1,9 +1,9 @@
-Require Import Bool.
-Require Import DepList List.
-Require Import Expr SepExpr SymEval.
+Require Import Bool List.
+Require Import MirrorShard.Env MirrorShard.Prover.
+Require Import MirrorShard.Expr MirrorShard.SepExpr.
+Require Import SymEval.
 Require Import Word Memory IL SepIL SymIL ILEnv.
-Require Import EqdepClass.
-Require Import Env Prover.
+(*Require Import EqdepClass. *)
 Require Import PropX PropXTac Nomega NArith.
 Require Import Array.
 

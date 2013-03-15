@@ -3,7 +3,7 @@
 Require Import Arith Div2 List NArith.
 Require Export Labels.
 
-Require Import Nomega Word Memory.
+Require Import Nomega Memory Word.
 
 (** * Setting up hidden word constants *)
 

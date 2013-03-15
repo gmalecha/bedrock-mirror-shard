@@ -1,7 +1,7 @@
 Require Import OrderedType FMapAVL.
 Require Import List.
 Require Import Setoid RelationClasses.
-Require Import Reflection.
+Require Import MirrorShard.Reflection.
 Require Import NPeano.
 
 Set Implict Arguments.

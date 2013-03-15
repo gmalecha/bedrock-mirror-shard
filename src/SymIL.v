@@ -1,14 +1,16 @@
 (** This file implements symbolic evaluation for the
  ** language defined in IL.v
  **)
+Require Import List.
+Require Import MirrorShard.Prover.
+Require Import MirrorShard.MultiMem.
+Require Import MirrorShard.Env.
+Require Import MirrorShard.Expr.
+Require Import MirrorShard.SepExpr.
+Require Import MirrorShard.Quantifier.
 Require Import Word.
 Require Import PropX.
-Require Import Expr SepExpr.
-Require Import Prover.
-Require Import Env.
 Require Structured SymEval.
-Import List.
-
 Require Import IL SepIL ILEnv.
 
 Set Implicit Arguments.
@@ -27,7 +29,7 @@ Section typed.
 
   (** Symbolic State **)
   Record SymState : Type :=
-  { SymMem   : option (SH.SHeap types pcT stT)
+  { SymMem   : option (SH.SHeap types)
   ; SymRegs  : SymRegType
   ; SymPures : list (expr types)
   }.
@@ -90,9 +92,9 @@ Section stateD.
   Variable types' : list type.
   Notation TYPES := (repr bedrock_types_r types').
   Variable funcs : functions TYPES.
-  Variable sfuncs : SEP.predicates TYPES pcT stT.
+  Variable sfuncs : SEP.predicates TYPES.
 
-  Definition stateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (ss : SymState TYPES pcT stT) : Prop :=
+  Definition stateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (ss : SymState TYPES) : Prop :=
     let (stn,st) := stn_st in
     match ss with
       | {| SymMem := m ; SymRegs := (sp, rp, rv) ; SymPures := pures |} =>
@@ -116,8 +118,8 @@ Section stateD.
                                          end)
     end.
 
-  Definition qstateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (qs : SymEval.Quant) (ss : SymState TYPES pcT stT) : Prop :=
-    SymEval.quantD vars uvars qs (fun vars_env meta_env => stateD meta_env vars_env cs stn_st ss).
+  Definition qstateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (qs : Quantifier.Quant) (ss : SymState TYPES) : Prop :=
+    Quantifier.quantD vars uvars qs (fun vars_env meta_env => stateD meta_env vars_env cs stn_st ss).
 
 End stateD.
 
@@ -142,7 +144,7 @@ Section Denotations.
   (** Denotation/reflection functions give the meaning of the reflected syntax *)
   Variable funcs' : functions TYPES.
   Notation funcs := (repr (bedrock_funcs_r types') funcs').
-  Variable sfuncs : SEP.predicates TYPES pcT stT.
+  Variable sfuncs : SEP.predicates TYPES.
   Variable uvars vars : env TYPES.
   
   Definition sym_regsD (rs : SymRegType TYPES) : option regs :=
@@ -259,20 +261,20 @@ Section Denotations.
 
   Section SymEvaluation.
     Variable Prover : ProverT TYPES.
-    Variable meval : MEVAL.MemEvaluator TYPES pcT stT.
+    Variable meval : MEVAL.MemEvaluator TYPES.
 
     Section with_facts.
     Variable Facts : Facts Prover.
 
-    Definition sym_evalLoc (lv : sym_loc TYPES) (ss : SymState TYPES pcT stT) : expr TYPES :=
+    Definition sym_evalLoc (lv : sym_loc TYPES) (ss : SymState TYPES) : expr TYPES :=
       match lv with
         | SymReg r => sym_getReg r (SymRegs ss)
         | SymImm l => l
         | SymIndir r w => fPlus (sym_getReg r (SymRegs ss)) w
       end.
 
-    Definition sym_evalLval (lv : sym_lvalue TYPES) (val : expr TYPES) (ss : SymState TYPES pcT stT)
-      : option (SymState TYPES pcT stT) :=
+    Definition sym_evalLval (lv : sym_lvalue TYPES) (val : expr TYPES) (ss : SymState TYPES)
+      : option (SymState TYPES) :=
       match lv with
         | SymLvReg r =>
           Some {| SymMem := SymMem ss 
@@ -309,7 +311,7 @@ Section Denotations.
             end
       end.
 
-    Definition sym_evalRval (rv : sym_rvalue TYPES) (ss : SymState TYPES pcT stT) : option (expr TYPES) :=
+    Definition sym_evalRval (rv : sym_rvalue TYPES) (ss : SymState TYPES) : option (expr TYPES) :=
       match rv with
         | SymRvLval (SymLvReg r) =>
           Some (sym_getReg r (SymRegs ss))
@@ -335,7 +337,7 @@ Section Denotations.
         (*Some (Expr.Const (TYPES := TYPES) (t := tvType 2) l) *)
       end.
 
-    Definition sym_assertTest (l : sym_rvalue TYPES) (t : test) (r : sym_rvalue TYPES) (ss : SymState TYPES pcT stT) (res : bool) 
+    Definition sym_assertTest (l : sym_rvalue TYPES) (t : test) (r : sym_rvalue TYPES) (ss : SymState TYPES) (res : bool) 
       : option (expr TYPES) :=
       let '(l, t, r) := 
         if res then (l, t, r)
@@ -357,7 +359,7 @@ Section Denotations.
         | _ , _ => None
       end.
 
-    Definition sym_evalInstr (i : sym_instr TYPES) (ss : SymState TYPES pcT stT) : option (SymState TYPES pcT stT) :=
+    Definition sym_evalInstr (i : sym_instr TYPES) (ss : SymState TYPES) : option (SymState TYPES) :=
       match i with 
         | SymAssign lv rv =>
           match sym_evalRval rv ss with
@@ -379,8 +381,8 @@ Section Denotations.
           end
       end.
 
-    Fixpoint sym_evalInstrs (is : list (sym_instr TYPES)) (ss : SymState TYPES pcT stT) 
-      : SymState TYPES pcT stT + (SymState TYPES pcT stT * list (sym_instr TYPES)) :=
+    Fixpoint sym_evalInstrs (is : list (sym_instr TYPES)) (ss : SymState TYPES) 
+      : SymState TYPES + (SymState TYPES * list (sym_instr TYPES)) :=
       match is with
         | nil => inl ss
         | i :: is =>
@@ -391,15 +393,15 @@ Section Denotations.
       end.
     End with_facts.
     
-    Variable learnHook : MEVAL.LearnHook TYPES (SymState TYPES pcT stT).
+    Variable learnHook : MEVAL.LearnHook TYPES (SymState TYPES).
 
     Inductive SymResult : Type :=
-    | Safe      : SymEval.Quant -> SymState TYPES pcT stT -> SymResult
-(*    | Unsafe    : SymEval.Quant -> SymResult *)
-    | SafeUntil : SymEval.Quant -> SymState TYPES pcT stT -> istream TYPES -> SymResult. 
+    | Safe      : Quantifier.Quant -> SymState TYPES -> SymResult
+(*    | Unsafe    : Quantifier.Quant -> SymResult *)
+    | SafeUntil : Quantifier.Quant -> SymState TYPES -> istream TYPES -> SymResult. 
 
-    Fixpoint sym_evalStream (facts : Facts Prover) (is : istream TYPES) (qs : SymEval.Quant) (u g : variables) 
-      (ss : SymState TYPES pcT stT) : SymResult :=
+    Fixpoint sym_evalStream (facts : Facts Prover) (is : istream TYPES) (qs : Quantifier.Quant) (u g : variables) 
+      (ss : SymState TYPES) : SymResult :=
       match is with
         | nil => Safe qs ss
         | inl (ins, st) :: is =>
@@ -420,7 +422,7 @@ Section Denotations.
                      |}
                   in
                   let (ss', qs') := learnHook Prover u g ss' facts' (sp :: nil) in
-                  sym_evalStream facts' is (SymEval.appendQ qs' qs) (u ++ SymEval.gatherAll qs') (g ++ SymEval.gatherEx qs') ss'
+                  sym_evalStream facts' is (Quantifier.appendQ qs' qs) (u ++ Quantifier.gatherAll qs') (g ++ Quantifier.gatherEx qs') ss'
                 | None => SafeUntil qs ss (inr asrt :: is)
               end
             | SymAssertCond l t r None =>
@@ -445,7 +447,7 @@ Section spec_functions.
   Local Notation "'stT'" := (tvType 1).
 
   Definition IL_mem_satisfies (cs : PropX.codeSpec (tvarD types pcT) (tvarD types stT)) 
-    (P : ST.hprop (tvarD types pcT) (tvarD types stT) nil) (stn_st : (tvarD types stT)) : Prop :=
+    (P : ST.hprop) (stn_st : (tvarD types stT)) : Prop :=
     PropX.interp cs (SepIL.SepFormula.sepFormula P stn_st).
   
   Definition IL_ReadWord : IL_stn_st -> tvarD types tvWord -> option (tvarD types tvWord) :=
@@ -473,7 +475,7 @@ Section spec_functions.
 
   Theorem IL_mem_satisfies_himp : forall cs P Q stn_st,
     IL_mem_satisfies cs P stn_st ->
-    ST.himp cs P Q ->
+    ST.himp P Q ->
     IL_mem_satisfies cs Q stn_st.
   Proof.
     unfold IL_mem_satisfies; intros.
@@ -483,7 +485,7 @@ Section spec_functions.
   Qed.
   Theorem IL_mem_satisfies_pure : forall cs p Q stn_st,
     IL_mem_satisfies cs (ST.star (ST.inj p) Q) stn_st ->
-    interp cs p.
+    p.
   Proof.
     unfold IL_mem_satisfies; intros.
     rewrite sepFormula_eq in H. 
@@ -495,8 +497,9 @@ Section spec_functions.
     Local Notation "'valT'" := (tvType 0) (only parsing).
 
     Variable mep : MEVAL.PredEval.MemEvalPred types.
-    Variable pred : SEP.predicate types pcT stT.
+    Variable pred : SEP.predicate types.
     Variable funcs : functions types.
+    Print SepIL.SepFormula.sepFormula.
 
     Hypothesis read_pred_correct : forall P (PE : ProverT_correct P funcs),
       forall args uvars vars cs facts pe p ve stn st,
@@ -507,11 +510,14 @@ Section spec_functions.
           applyD (exprD funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
-          | Some p => ST.satisfies cs p stn st
+          | Some p => PropX.interp cs (p stn st)
+                     (* ST.satisfies cs p stn st *)
         end ->
         match exprD funcs uvars vars ve valT with
           | Some v =>
-            ST.HT.smem_get_word (implode stn) p st = Some v
+            smem_read_word stn p st = Some v (* @multi_read W smem W B
+              (fun 
+            ST.HT.smem_get_word (implode stn) p st = Some v *)
           | _ => False
         end.
 
@@ -525,16 +531,16 @@ Section spec_functions.
           applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
-          | Some p => ST.satisfies cs p stn st
+          | Some p => PropX.interp cs (p stn st) (* ST.satisfies cs p stn st *)
         end ->
         match 
           applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args' _ (SEP.SDenotation pred)
           with
           | None => False
           | Some pr => 
-            match ST.HT.smem_set_word (explode stn) p v st with
+            match smem_write_word stn p v st with
               | None => False
-              | Some sm' => ST.satisfies cs pr stn sm'
+              | Some sm' => PropX.interp cs (pr stn sm')
             end
         end.
 
@@ -547,9 +553,9 @@ Section spec_functions.
           applyD (exprD funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
-          | Some p => ST.satisfies cs p stn st
+          | Some p => PropX.interp cs (p stn st)
         end ->
-        match ST.HT.smem_get p st with
+        match smem_get p st with
           | Some b => exprD funcs uvars vars ve valT = Some (BtoW b)
           | _ => False
         end.
@@ -564,25 +570,25 @@ Section spec_functions.
           applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
-          | Some p => ST.satisfies cs p stn st
+          | Some p => PropX.interp cs (p stn st)
         end ->
         match 
           applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args' _ (SEP.SDenotation pred)
           with
           | None => False
           | Some pr => 
-            match ST.HT.smem_set p (WtoB v) st with
+            match smem_set p (WtoB v) st with
               | None => False
-              | Some sm' => ST.satisfies cs pr stn sm'
+              | Some sm' => PropX.interp cs (pr stn sm')
             end
         end.
 
     Theorem interp_satisfies : forall cs P stn st,
       PropX.interp cs (SepIL.SepFormula.sepFormula P (stn,st)) <->
-      (HT.satisfies (memoryIn (IL.Mem st)) (IL.Mem st) /\ ST.satisfies cs P stn (memoryIn (IL.Mem st))).
+      (models (memoryIn (IL.Mem st)) (IL.Mem st) /\ PropX.interp cs (P stn (memoryIn (IL.Mem st)))).
     Proof.
       clear. intros. rewrite sepFormula_eq. unfold sepFormula_def. simpl in *.
-      intuition. eapply ST.HT.satisfies_memoryIn.
+      intuition. eapply memoryIn_sound.
     Qed.
 
     Require Import Reflection.
@@ -593,6 +599,7 @@ Section spec_functions.
                | [ H : _ /\ _ |- _ ] => destruct H
              end.
 
+(*
     (** TODO: find a better place for these! **)
     Lemma mem_set_relevant_memoryIn : forall m p v m',
       H.mem_set m p v = Some m' ->
@@ -625,10 +632,12 @@ Section spec_functions.
              end.
       congruence.
     Qed.
+*)
 
     Lemma mep_correct : @MEVAL.PredEval.MemEvalPred_correct types pcT stT (IL.settings * IL.state)
       (tvType 0) (tvType 0) IL_mem_satisfies IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte mep pred funcs.
     Proof.
+    Admitted. (*
       constructor; intros; destruct stn_st as [ stn st ];
         match goal with
           | [ H : match ?X with _ => _ end |- _ ] =>
@@ -818,20 +827,20 @@ Section spec_functions.
         Qed.
         
         eauto using memoryIn_join. }
-    Qed.
+    Qed. *)
 
     Variable predIndex : nat.
 
     Theorem MemPredEval_To_MemEvaluator_correct preds : 
       nth_error preds predIndex = Some pred ->
       @MEVAL.MemEvaluator_correct types pcT stT
-      (@MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ pcT stT mep predIndex) funcs preds
+      (@MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ mep predIndex) funcs preds
       (IL.settings * IL.state) (tvType 0) (tvType 0) IL_mem_satisfies
       IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte.
     Proof.
       intros.
-      eapply MEVAL.PredEval.MemEvaluator_MemEvalPred_correct; simpl;
-        try eauto using IL_mem_satisfies_himp, IL_mem_satisfies_pure, mep_correct.
+      eapply MEVAL.PredEval.MemEvaluator_MemEvalPred_correct; simpl.
+      eapply H. eapply mep_correct. eapply IL_mem_satisfies_himp. eapply IL_mem_satisfies_pure.
     Qed.
 
   End ForWord.
