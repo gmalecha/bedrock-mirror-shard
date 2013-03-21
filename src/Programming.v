@@ -476,10 +476,11 @@ Hint Extern 1 (?specs _ = Some _) =>
     | [ H : specs _ = Some _ |- _ ] => apply (specs_cong H); congruence
   end.
 
-Lemma use_himp : forall pc state specs (P Q : hprop pc state nil), himp specs P Q
-  -> forall s m, interp specs (P s m)
+Lemma use_himp : forall (P Q : hprop), himp P Q
+  -> forall specs s m, interp specs (P s m)
     -> interp specs (Q s m).
-  intros; apply (Imply_sound (H _ _)); auto.
+Proof.
+  intros. eapply Imply_sound. eapply H. auto.
 Qed.
 
 Lemma Imply_refl : forall pc state specs (P : PropX pc state),

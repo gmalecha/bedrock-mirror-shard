@@ -192,5 +192,37 @@ Module SepTheoryPropX_Kernel (SM : SeparationMemory) (PC_ST : PcSt) <:
     do 2 eapply Exists_I; propxIntuition; eauto.
     eapply Exists_I; propxIntuition.
   Qed.
+
+  (** Interp **)
+  Lemma interp_himp : forall cs stn sm P Q,
+    interp cs (P stn sm) ->
+    himp P Q ->
+    interp cs (Q stn sm).
+  Proof.
+    unfold himp; intros.
+    eapply Imply_E. eapply H0. auto.
+  Qed.
+
+  Theorem interp_star : forall cs stn sm P Q,
+    interp cs ((star P Q) stn sm) ->
+    exists sm1 sm2, SM.split sm sm1 sm2 /\
+      interp cs (P stn sm1) /\ interp cs (Q stn sm2).
+  Proof.
+    unfold star. intros; propxFo; eauto.
+  Qed.
+
+  Theorem interp_pure : forall cs stn sm P,
+    interp cs ((inj P) stn sm) ->
+    P /\ sm = SM.smem_emp. 
+  Proof.
+    unfold inj, iinj, iinjX. intros. propxFo. 
+  Qed.
+
+  Theorem interp_ex : forall cs stn sm T (P : T -> _),
+    interp cs ((ex P) stn sm) ->
+    exists x, interp cs ((P x) stn sm).
+  Proof.
+    unfold ex. intros. propxFo; eauto.
+  Qed.
   
 End SepTheoryPropX_Kernel.

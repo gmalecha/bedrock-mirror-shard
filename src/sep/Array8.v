@@ -193,16 +193,16 @@ Section correctness.
   Variable types' : list type.
   Definition types0 := types types'.
 
-  Definition ssig : SEP.predicate types0 pcT stT.
-    refine (SEP.PSig _ _ _ (listBT :: wordT :: nil) _).
+  Definition ssig : SEP.predicate types0.
+    refine (SEP.PSig _ (listBT :: wordT :: nil) _).
     exact array8.
   Defined.
 
-  Definition ssig_r : Env.Repr (SEP.predicate types0 pcT stT) :=
+  Definition ssig_r : Env.Repr (SEP.predicate types0) :=
     Eval cbv beta iota zeta delta [ Env.listOptToRepr ] in 
       let lst := 
         None :: None :: None :: Some ssig :: nil
-      in Env.listOptToRepr lst (SEP.Default_predicate _ _ _).
+      in Env.listOptToRepr lst (SEP.Default_predicate _).
 
   Variable funcs' : functions types0.
   Definition funcs := Env.repr (funcs_r _) funcs'.

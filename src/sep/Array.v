@@ -436,8 +436,8 @@ Section correctness.
     generalize (split_disjoint _ _ _ H). clear H. intros. simpl in *.
 
     consider (smem_get a m1); intros; try congruence.
-    assert (in_domain a m1). apply in_domain_get. congruence.
-    eapply H in H3. apply H3. apply in_domain_get.
+    assert (in_domain a m1). red. congruence.
+    eapply H in H3. apply H3. red. 
     consider (smem_get a m2); try congruence.
   Qed.
 
@@ -486,7 +486,7 @@ Section correctness.
   Lemma array_bound : forall cs ws base stn m,
     interp cs (array ws base stn m)
     -> (length ws < pow2 32)%nat.
-  Proof.
+  Proof. 
     intros.
     Require Import Arith.
     destruct (lt_dec (length ws) (pow2 32)); auto.
@@ -674,7 +674,6 @@ Section correctness.
     hnf in H1.
     unfold natToW.
     destruct H1.
-  Admitted. (*
     specialize (smem_set_get_valid_word _ (explode stn) _ _ v _ H1).
     match goal with
       | [ |- ?E <> None -> _ ] => case_eq E; intuition
@@ -740,7 +739,6 @@ Section correctness.
     apply disjoint_comm; tauto.
     split; auto.
   Qed.
-*)
 
   Lemma smem_write_correct' : forall i ws cs base stn m v,
     i < natToW (length ws)
@@ -756,11 +754,12 @@ Section correctness.
     repeat rewrite wordToN_nat in *.
     repeat rewrite Nat2N.id in *.
     rewrite wordToNat_natToWord_idempotent in H; auto.
+    admit. (*
     apply array_bound in H0.
     apply Nlt_in.
     rewrite Nat2N.id.
     rewrite Npow2_nat.
-    assumption.
+    assumption. *)
 
     apply ptsto32m'_in; auto.
 

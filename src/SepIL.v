@@ -515,6 +515,74 @@ Require MirrorShard.SepExpr MirrorShard.SepHeap.
 Module SEP := SepExpr.Make ST.
 Module SH := SepHeap.Make SEP.
 
+(** This relies on the fact that I'm using PropX **)
+Lemma sheapD_pures : forall ts funcs preds cs U G stn sm h,
+  interp cs ((SEP.sexprD funcs preds U G (SH.sheapD (types := ts) h)) stn sm) ->
+  Expr.AllProvable funcs U G (SH.pures h).
+Proof.
+  intros.
+  eapply STK.interp_himp in H.
+  Focus 2. rewrite SH.sheapD_def. rewrite SH.starred_def. reflexivity.
+  simpl in *.
+
+  repeat match goal with
+           | [ H : exists x, _ |- _ ] => destruct H
+           | [ H : interp _ ((ST.star _ _) _ _) |- _ ] =>
+             apply STK.interp_star in H
+           | [ H : _ /\ _ |- _ ] => destruct H
+         end.
+  clear - H2. generalize dependent x1.
+  induction (SH.pures h); simpl; auto.
+  unfold Expr.Provable. destruct (Expr.exprD funcs U G a Expr.tvProp); intros; 
+  repeat match goal with
+           | [ H : exists x, _ |- _ ] => destruct H
+           | [ H : interp _ ((ST.star _ _) _ _) |- _ ] =>
+             apply STK.interp_star in H
+           | [ H : interp _ ((ST.inj _) _ _) |- _ ] =>
+             apply STK.interp_pure in H
+           | [ H : _ /\ _ |- _ ] => destruct H
+           | [ |- _ /\ _ ] => split
+           | [ |- _ ] => propxFo
+         end; eauto.
+Qed.
+
+Lemma sheapD_pures_SF : forall ts funcs preds cs U G stn sm h,
+  interp cs (![(SEP.sexprD funcs preds U G (SH.sheapD (types := ts) h))] (stn, sm)) ->
+  Expr.AllProvable funcs U G (SH.pures h).
+Proof.
+  intros.
+  rewrite sepFormula_eq in H.
+  unfold sepFormula_def in H. simpl in H. eapply sheapD_pures in H. auto.
+Qed.
+
+Require Import Reflection.
+
+Theorem interp_WellTyped_sexpr : forall ts funcs (preds : SEP.predicates ts) cs s vars uvars stn m,
+  interp cs ((SEP.sexprD funcs preds uvars vars s) stn m) ->
+  SEP.WellTyped_sexpr (Expr.typeof_funcs funcs) (SEP.typeof_preds preds) (Expr.typeof_env uvars) (Expr.typeof_env vars) s = true.
+Proof.
+  induction s; simpl; intros; auto.
+  { consider (Expr.exprD funcs uvars vars e Expr.tvProp); intros.
+    eapply Expr.is_well_typed_correct_only in H; eauto using Expr.typeof_env_WellTyped_env, Expr.typeof_funcs_WellTyped_funcs.
+    eapply STK.interp_pure in H0. unfold SepExpr.BadInj. intuition. }
+  { eapply STK.interp_star in H. 
+    repeat match goal with 
+             | [ H : exists x, _ |- _ ] => destruct H
+             | [ H : _ /\ _ |- _ ] => destruct H
+           end.
+    erewrite IHs1; eauto.
+    erewrite IHs2; eauto. }
+  { eapply STK.interp_ex in H. destruct H.
+    eapply IHs in H. simpl in *. auto. }
+  { unfold SEP.typeof_preds. Require Import ListFacts. rewrite map_nth_error_full. destruct (nth_error preds f).
+    { destruct p; simpl in *. generalize dependent SDomain. clear. induction l; destruct SDomain; simpl; intros; auto.
+      eapply STK.interp_pure in H. unfold SepExpr.BadPredApply in *. intuition. PropXTac.propxFo.
+      consider (Expr.exprD funcs uvars vars a t); intros.
+      erewrite Expr.is_well_typed_correct_only; eauto using Expr.typeof_env_WellTyped_env, Expr.typeof_funcs_WellTyped_funcs.
+      eapply STK.interp_pure in H0. unfold SepExpr.BadPredApply. intuition. }
+    { eapply STK.interp_pure in H. unfold SepExpr.BadPred. intuition. } }
+Qed.
+
 Theorem natToW_plus : forall n m, natToW (n + m) = natToW n ^+ natToW m.
   apply natToWord_plus.
 Qed.

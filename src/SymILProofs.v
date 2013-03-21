@@ -6,6 +6,7 @@ Require Import MirrorShard.EqdepClass.
 Require Import MirrorShard.SepExpr.
 Require Import MirrorShard.Expr.
 Require Import MirrorShard.Prover.
+Require Import MirrorShard.Quantifier.
 Require Import MirrorShard.Env TypedPackage.
 Require Import IL SepIL.
 Require Import Word Memory.
@@ -147,10 +148,8 @@ Module SymIL_Correct.
         end.
         simpl in *.
         destruct (WriteWord s0 (Mem s1) (evalLoc s1 l) valD); try contradiction. t_correct.
-        Transparent stateD. destruct ss; destruct SymRegs; destruct p. simpl in *. Opaque stateD. intuition. subst.        
-        generalize SH.sheapD_pures. unfold SEP.ST.satisfies. intro XXX. 
-        rewrite sepFormula_eq in H3. unfold sepFormula_def in H3. simpl in *.
-        specialize (@XXX _ _ _ funcs preds meta_env vars_env cs _ _ _ H3). 
+        Transparent stateD. destruct ss; destruct SymRegs; destruct p. simpl in *. Opaque stateD. intuition. subst.
+        eapply sheapD_pures_SF in H3.
         apply AllProvable_app' in H6. apply AllProvable_app; intuition auto. }
       { eapply (@sym_evalLoc_correct s) in H0; eauto.
         simpl.
@@ -161,9 +160,7 @@ Module SymIL_Correct.
         simpl in *.
         destruct (WriteByte (Mem s1) (evalLoc s1 l) (WtoB valD)); try contradiction. t_correct.
         Transparent stateD. destruct ss; destruct SymRegs; destruct p. simpl in *. Opaque stateD. intuition. subst.
-        generalize SH.sheapD_pures. unfold SEP.ST.satisfies. intro XXX. 
-        rewrite sepFormula_eq in H3. unfold sepFormula_def in H3. simpl in *.
-        specialize (@XXX _ _ _ funcs preds meta_env vars_env cs _ _ _ H3). 
+        eapply sheapD_pures_SF in H3.
         apply AllProvable_app' in H6. apply AllProvable_app; intuition auto. }
     Qed.
 
@@ -289,13 +286,13 @@ Module SymIL_Correct.
 
     Variable fs : functions types.
     Let funcs := repr (bedrock_funcs_r ts) fs.
-    Variable preds : SEP.predicates types pcT stT.
+    Variable preds : SEP.predicates types.
 
     Variable Prover : ProverT types.
     Variable PC : ProverT_correct Prover funcs.
 
-    Variable meval : MEVAL.MemEvaluator types pcT stT.
-    Variable meval_correct : MEVAL.MemEvaluator_correct meval funcs preds tvWord tvWord
+    Variable meval : MEVAL.MemEvaluator types.
+    Variable meval_correct : MEVAL.MemEvaluator_correct pcT stT meval funcs preds tvWord tvWord
       (@IL_mem_satisfies ts) (@IL_ReadWord ts) (@IL_WriteWord ts) (@IL_ReadByte ts) (@IL_WriteByte ts).
 
     Ltac t_correct := 
@@ -377,7 +374,7 @@ Module SymIL_Correct.
       Transparent stateD.
     Qed.
 
-    Variable learnHook : MEVAL.LearnHook types (SymState types pcT stT).
+    Variable learnHook : MEVAL.LearnHook types (SymState types).
     Variable learn_correct : @MEVAL.LearnHook_correct _ _ pcT stT learnHook (@stateD _ funcs preds) funcs preds.
 
     Ltac shatter_state ss :=
@@ -589,6 +586,8 @@ Module SymIL_Correct.
       
     Definition NO_MORE_COND : Prop := True.
 
+    Check MEVAL.hook_sound.
+
     Ltac sym_eval_prover IHpath := 
       repeat match goal with
                | [ H : Valid _ (?A ++ ?b) (?C ++ ?d) _
@@ -637,7 +636,7 @@ Module SymIL_Correct.
                end
                | [ H : learnHook _ ?U' ?G' ?SS ?f ?F = (?A, ?B)
                  , H' : stateD _ _ ?U ?G _ _ _ 
-                 , LC : MEVAL.LearnHook_correct _ _ _ _ 
+                 , LC : MEVAL.LearnHook_correct _ _ _ _ _ _ 
                  , PC : ProverT_correct _ _ |- _ ] =>
                  (cutrewrite (U' = typeof_env U) in H; [ | rewrite typeof_env_app; f_equal; auto ] ;
                   cutrewrite (G' = typeof_env G) in H; [ | rewrite typeof_env_app; f_equal; auto ] ;
@@ -744,8 +743,6 @@ Module SymIL_Correct.
       induction path; simpl; intros; sym_eval_prover IHpath; try contradiction. 
     Qed.
 
-    Lemma appendQ_QBase_r : forall a, appendQ a QBase = a.
-    Proof. clear. induction a; simpl; intros; think; auto. Qed.
 (*
     Theorem evalStream_correct : forall sound_or_safe cs stn path facts ss qs env_q uvars vars res,
       sym_evalStream Prover meval learnHook facts path (appendQ qs env_q) uvars vars ss = res ->

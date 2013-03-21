@@ -1,6 +1,6 @@
 PROVERS = Word Locals ArrayBound
-# SEP = PtsTo Array Array8 
 #  Transitivity
+SEP = PtsTo Array Array8 Locals
 MODULES    := Tactics ListFacts \
 	Nomega Word Labels LabelMap StringSet \
 	PropX PropXRel PropXTac \
@@ -16,10 +16,11 @@ MODULES    := Tactics ListFacts \
 	IL ReifyIL \
 	ILEnv SepIL \
 	SymIL SymILProofs SymILTac \
-	CancelIL \
+	CancelTacIL \
 	ILTacCommon ILTac \
-	Bedrock \
 	AMD64_gas
+#Bedrock	\
+
 
 TESTS := UnfolderTests
 VS         := $(MODULES:%=%.v)

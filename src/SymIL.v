@@ -499,7 +499,6 @@ Section spec_functions.
     Variable mep : MEVAL.PredEval.MemEvalPred types.
     Variable pred : SEP.predicate types.
     Variable funcs : functions types.
-    Print SepIL.SepFormula.sepFormula.
 
     Hypothesis read_pred_correct : forall P (PE : ProverT_correct P funcs),
       forall args uvars vars cs facts pe p ve stn st,

@@ -9,7 +9,7 @@ Require Import PropX.
 Require Import TacPackIL ILEnv.
 Require Import IL SepIL.
 Require Import Word Memory.
-Require Import SymILTac CancelIL.
+Require Import SymILTac CancelTacIL.
 
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -175,8 +175,38 @@ Section canceller.
   Variable ts : list type.
   Let types := Env.repr BedrockCoreEnv.core ts.
   Variable funcs : functions types.
-  Variable preds : SEP.predicates types BedrockCoreEnv.pc BedrockCoreEnv.st.
+  Variable preds : SEP.predicates types.
   Variable algos : ILAlgoTypes.AllAlgos ts.
+
+  Theorem ApplyCancelSep_with_eq :
+    forall (types : list type) (funcs : functions types)
+      (preds : SH.SE.predicates types) (prover : ProverT types)
+      (hintsFwd hintsBwd : list (UNF.LEM.sepLemma types)) 
+      (bound : nat) (uvars : env types) (lhs rhs : SH.SE.sexpr types)
+      (hyps : exprs types) (tfuncs : tfunctions)
+      (tpreds : UNF.SH.SE.tpredicates) (tuvars : tenv)
+      (cr : CANCEL_LOOP.cancelResult types) (prog : bool),
+      ProverT_correct prover funcs ->
+      typeof_funcs funcs = tfuncs ->
+      UNF.SH.SE.typeof_preds preds = tpreds ->
+      WellTyped_env tuvars uvars ->
+      UNF.SH.SE.WellTyped_sexpr tfuncs tpreds tuvars nil rhs = true ->
+      AllProvable funcs uvars nil hyps ->
+      UNF.hintSideD funcs preds hintsFwd ->
+      UNF.hintSideD funcs preds hintsBwd ->
+      CANCEL_LOOP.cancel tpreds prover hintsFwd hintsBwd bound hyps tuvars nil lhs rhs =
+      (cr, prog) ->
+      (if prog
+        then CANCEL_LOOP.cancelResultD funcs preds uvars nil cr
+        else SH.SE.himp funcs preds uvars nil lhs rhs) ->
+      SH.SE.himp funcs preds uvars nil lhs rhs.
+  Proof.
+    exact CANCEL_LOOP.cancelLoop_with_eq'.
+  Qed.
+  
+(*
+  Print CANCEL_LOOP.
+  
 
   Lemma ApplyCancelSep_with_eq : 
     forall (algos_correct : ILAlgoTypes.AllAlgos_correct funcs preds algos),
@@ -212,44 +242,31 @@ Section canceller.
     himp cs (@SEP.sexprD _ _ _ funcs preds meta_env nil l)
             (@SEP.sexprD _ _ _ funcs preds meta_env nil r).
   Proof. intros. eapply ApplyCancelSep_with_eq'; eauto. Qed.
+*)
 
-  Lemma ApplyCancelSep : 
-    forall (algos_correct : ILAlgoTypes.AllAlgos_correct funcs preds algos),
-    forall (meta_env : env (Env.repr BedrockCoreEnv.core types)) (hyps : Expr.exprs (_)),
-    forall (l r : SEP.sexpr types BedrockCoreEnv.pc BedrockCoreEnv.st),
-      Expr.AllProvable funcs meta_env nil hyps ->
-    forall (WTR : SEP.WellTyped_sexpr (typeof_funcs funcs) (SEP.typeof_preds preds) (typeof_env meta_env) nil r = true) cs,
-    match canceller preds algos (typeof_env meta_env) hyps l r with
-      | Some {| AllExt := new_vars
-         ; ExExt  := new_uvars
-         ; Lhs    := lhs'
-         ; Rhs    := rhs'
-         ; Subst  := subst
-         |} =>
-        Expr.forallEach new_vars (fun nvs : Expr.env types =>
-          let var_env := nvs in
-          Expr.AllProvable_impl funcs meta_env var_env
-          (existsSubst funcs var_env subst 0 
-            (map (fun x => existT (fun t => option (tvarD types t)) (projT1 x) (Some (projT2 x))) meta_env ++
-             map (fun x => existT (fun t => option (tvarD types t)) x None) new_uvars)
-            (fun meta_env : Expr.env types =>
-                (Expr.AllProvable_and funcs meta_env var_env
-                  (himp cs 
-                    (SEP.sexprD funcs preds meta_env var_env
-                      (SH.sheapD (SH.Build_SHeap _ _ (SH.impures lhs') nil (SH.other lhs'))))
-                    (SEP.sexprD funcs preds meta_env var_env
-                      (SH.sheapD (SH.Build_SHeap _ _ (SH.impures rhs') nil (SH.other rhs')))))
-                  (SH.pures rhs')) ))
-            (SH.pures lhs'))
-      | None => 
-        himp cs (@SEP.sexprD _ _ _ funcs preds meta_env nil l)
-                (@SEP.sexprD _ _ _ funcs preds meta_env nil r)
-    end ->
-    himp cs (@SEP.sexprD _ _ _ funcs preds meta_env nil l)
-            (@SEP.sexprD _ _ _ funcs preds meta_env nil r).
+  Lemma ApplyCancelSep : forall (types : list type) (funcs : functions types)
+      (preds : SH.SE.predicates types) (prover : ProverT types)
+      (hintsFwd hintsBwd : list (UNF.LEM.sepLemma types)) 
+      (bound : nat) (uvars : env types) (lhs rhs : SH.SE.sexpr types)
+      (hyps : exprs types) (tfuncs : tfunctions)
+      (tpreds : UNF.SH.SE.tpredicates) (tuvars : tenv),
+      ProverT_correct prover funcs ->
+      typeof_funcs funcs = tfuncs ->
+      UNF.SH.SE.typeof_preds preds = tpreds ->
+      WellTyped_env tuvars uvars ->
+      UNF.SH.SE.WellTyped_sexpr tfuncs tpreds tuvars nil rhs = true ->
+      AllProvable funcs uvars nil hyps ->
+      UNF.hintSideD funcs preds hintsFwd ->
+      UNF.hintSideD funcs preds hintsBwd ->
+      let '(cr,prog) := CANCEL_LOOP.cancel tpreds prover hintsFwd hintsBwd bound hyps tuvars nil lhs rhs in
+      match prog with
+        | true => CANCEL_LOOP.cancelResultD funcs preds uvars nil cr
+        | false => SH.SE.himp funcs preds uvars nil lhs rhs
+      end ->
+      SH.SE.himp funcs preds uvars nil lhs rhs.
   Proof. 
-    intros. consider (canceller preds algos (typeof_env meta_env) hyps l r); intros; auto.
-    eapply ApplyCancelSep_with_eq; eauto. 
+    intros. consider (CANCEL_LOOP.cancel tpreds prover hintsFwd hintsBwd bound hyps tuvars nil lhs rhs); intros.
+    eapply ApplyCancelSep_with_eq in H6; eassumption. 
   Qed.
 
 End canceller.
@@ -263,7 +280,7 @@ Qed.
 
 Lemma interp_interp_himp : forall cs P Q stn_st,
   interp cs (![ P ] stn_st) ->
-  (himp cs P Q) ->
+  (himp P Q) ->
   interp cs (![ Q ] stn_st).
 Proof.
   unfold himp. intros. destruct stn_st.
@@ -271,9 +288,9 @@ Proof.
   eapply Imply_E; eauto. 
 Qed.
 
-Theorem change_Imply_himp : forall (specs : codeSpec W (settings * state)) p q s,
-  himp specs p q
-  -> interp specs (![p] s ---> ![q] s)%PropX.
+Theorem change_Imply_himp : forall p q s,
+  himp p q
+  -> forall specs, interp specs (![p] s ---> ![q] s)%PropX.
 Proof.
   rewrite sepFormula_eq.
   unfold himp, sepFormula_def.
@@ -290,8 +307,8 @@ Ltac change_to_himp := try apply ignore_regs;
     | _ => apply change_Imply_himp
   end.
 
-Definition smem_read stn := SepIL.ST.HT.smem_get_word (IL.implode stn).
-Definition smem_write stn := SepIL.ST.HT.smem_set_word (IL.explode stn).
+Definition smem_read stn := SepIL.smem_read_word stn. 
+Definition smem_write stn := SepIL.smem_write_word stn. 
 
 (** Symbolic Execution **)
 (************************)
