@@ -18,8 +18,8 @@ MODULES    := Tactics ListFacts \
 	SymIL SymILProofs SymILTac \
 	CancelTacIL \
 	ILTacCommon ILTac \
+	Bedrock	\
 	AMD64_gas
-#Bedrock	\
 
 
 TESTS := UnfolderTests

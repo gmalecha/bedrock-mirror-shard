@@ -16,13 +16,14 @@ Add Rec LoadPath "/usr/local/lib/coq/user-contrib/" as Timing.
 Add ML Path "/usr/local/lib/coq/user-contrib/". 
 Declare ML Module "Timing_plugin".
 *)
+Module SEP_LEMMA := SepLemma.SepLemma SEP.
 
-Module UNF := Unfolder.Make SH ExprUnify.UNIFIER.
+Module UNF := Unfolder.Make SH ExprUnify.UNIFIER SEP_LEMMA.
 
 Module ILAlgoTypes <: AlgoTypes SEP BedrockCoreEnv.
   Module PACK := TypedPackage.Make SEP BedrockCoreEnv.
   Module SEP_REIFY := ReifySepExpr.ReifySepExpr SEP.
-  Module HINTS_REIFY := ReifyHints.Make UNF.SH.SE.
+  Module HINTS_REIFY := ReifyHints.Make UNF.SH.SE SEP_LEMMA.
 
   Record AllAlgos (ts : list type) : Type :=
   { Prover : option (ProverT (repr BedrockCoreEnv.core ts))
@@ -283,7 +284,7 @@ Module ILAlgoTypes <: AlgoTypes SEP BedrockCoreEnv.
           eval simpl in ts
       end
     in
-    HINTS_REIFY.collectTypes_hints unfoldTac isConst fwd (Reflect.Tnil) ltac:(fun rt =>
+    HINTS_REIFY.collectTypes_hints unfoldTac isConst fwd (Reify.Tnil) ltac:(fun rt =>
       HINTS_REIFY.collectTypes_hints unfoldTac isConst bwd rt ltac:(fun rt =>
         let rt := constr:(Tcons pcType (Tcons stateType rt)) in
         let types := ReifyExpr.extend_all_types rt types in
@@ -443,12 +444,14 @@ Ltac opaque_pack pack :=
       refine (@Build_TypedPackage env algos _); abstract (exact pf)
   end.
 
+(*
 Goal TypedPackage.
   Require provers.ReflexivityProver.
   build_prover_pack provers.ReflexivityProver.ReflexivityProver ltac:(fun x => 
     build_mem_pack (@MEVAL.Default.package bedrock_types_r (tvType 0) (tvType 1) (tvType 0) (tvType 0) IL_mem_satisfies IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte) ltac:(fun y =>   
     glue_pack x y ltac:(opaque_pack))).
 Qed.
+*)
 
 (*
 Goal TypedPackage bedrock_types_r (tvType 0) (tvType 1) IL_mem_satisfies IL_ReadWord IL_WriteWord.
@@ -541,6 +544,12 @@ Module Extension.
     destruct fwd; destruct bwd; constructor; simpl; auto; repeat rewrite app_nil_r; eauto using hintSideD_app.
   Qed.
 
+  Definition auto_ext' : TypedPackage.
+  build_prover_pack provers.ReflexivityProver.ReflexivityProver ltac:(fun x => 
+    build_mem_pack (@MEVAL.Default.package bedrock_types_r (tvType 0) (tvType 1) (tvType 0) (tvType 0) IL_mem_satisfies IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte) ltac:(fun y =>   
+    glue_pack x y ltac:(opaque_pack))).
+  Defined.
+
   Ltac extend unfoldTac isConst pack prover mevals fwd bwd :=
     let reduce_repr t := eval cbv beta iota zeta delta
       [ ILAlgoTypes.Env ILAlgoTypes.PACK.Funcs ILEnv.bedrock_funcs_r map hd tl Env.listToRepr Env.listOptToRepr Env.repr_combine Env.nil_Repr Env.repr ILEnv.BedrockCoreEnv.core 
@@ -555,38 +564,51 @@ Module Extension.
     gather_env_meval mevals ts fs ps ltac:(fun ts fs ps =>
     (*TIME stop_timer "extend:gather" ; *)
     (*TIME start_timer "extend:reduce_repr" ; *)
+      idtac "0" ;
       let types := reduce_repr (Env.repr ts nil) in
     (*TIME stop_timer "extend:reduce_repr" ; *)
     (*TIME start_timer "extend:reify" ; *)
-      HINTS_REIFY.collectTypes_hints unfoldTac isConst fwd (Reflect.Tnil) ltac:(fun Ts =>
+      HINTS_REIFY.collectTypes_hints unfoldTac isConst fwd (Reify.Tnil) ltac:(fun Ts =>
       HINTS_REIFY.collectTypes_hints unfoldTac isConst bwd Ts ltac:(fun Ts => (
+        idtac "1" ;
       let types := ReifyExpr.extend_all_types Ts types in
+        idtac "1.0" ;
       set (typesV := types) ;
       let funcs := reduce_repr (Env.repr (fs types) nil) in
       let preds := reduce_repr (Env.repr (ps types) nil) in
       let pcT := ILEnv.BedrockCoreEnv.pc in
       let stateT := ILEnv.BedrockCoreEnv.st in
+        idtac "1.1" ;
       HINTS_REIFY.reify_hints unfoldTac pcT stateT isConst fwd types funcs preds ltac:(fun funcs preds fwd' =>
+        idtac "1.2" ;
       HINTS_REIFY.reify_hints unfoldTac pcT stateT isConst bwd types funcs preds ltac:(fun funcs preds bwd' => (
+        idtac "3" ;
     (*TIME stop_timer "extend:reify" ; *)
     (*TIME start_timer "extend:lifting" ; *)
         let types_r := eval cbv beta iota zeta delta [ typesV Env.listToRepr map ] in (Env.listToRepr typesV Expr.EmptySet_type) in
         set (types_rV := types_r) ;
+          idtac "3.1" ;
         let funcs_r := HINTS_REIFY.lift_signatures_over_repr funcs types_rV in
         let funcs_r := eval cbv beta iota zeta delta [ Env.listToRepr map ] in
           (fun ts => Env.listToRepr (funcs_r ts) (Expr.Default_signature (Env.repr types_rV ts))) in
+          idtac "3.2" ;
         set (funcs_rV := funcs_r) ;
-        let preds_r := HINTS_REIFY.lift_ssignatures_over_repr preds types_rV pcT stateT in
+        let preds_r := HINTS_REIFY.lift_ssignatures_over_repr preds types_rV in
+          idtac "3.3" ;
         let preds_r := eval cbv beta iota zeta delta [ Env.listToRepr map ] in
-          (fun ts => Env.listToRepr (preds_r ts) (SEP.Default_predicate (Env.repr types_rV ts) pcT stateT)) in
+          (fun ts => Env.listToRepr (preds_r ts) (SEP.Default_predicate (Env.repr types_rV ts))) in
+          idtac "4" ;
         set (preds_rV := preds_r) ;
     (*TIME stop_timer "extend:lifting" ; *)
     (*TIME start_timer "extend:combining" ; *)
         set (env := {| ILAlgoTypes.PACK.Types := types_rV 
                      ; ILAlgoTypes.PACK.Funcs := funcs_rV
                      ; ILAlgoTypes.PACK.Preds := preds_rV |}) ;
-        let fwd' := HINTS_REIFY.lift_lemmas_over_repr fwd' types_rV pcT stateT in
-        let bwd' := HINTS_REIFY.lift_lemmas_over_repr bwd' types_rV pcT stateT in
+        idtac "5" ;
+        let fwd' := HINTS_REIFY.lift_lemmas_over_repr fwd' types_rV in
+          idtac "5.1" ;
+        let bwd' := HINTS_REIFY.lift_lemmas_over_repr bwd' types_rV in
+          idtac "6" ;
         let nprover :=
           match prover with
             | tt => match pack with
@@ -599,10 +621,11 @@ Module Extension.
                    end
           end
         in
+        idtac "7" ;
         let nmevals :=
           match mevals with
             | tt => match pack with
-                      | tt => constr:(fun ts => @None (MEVAL.MemEvaluator (Env.repr types_rV ts) pcT stateT))
+                      | tt => constr:(fun ts => @None (MEVAL.MemEvaluator (Env.repr types_rV ts)))
                       | _ => red_pack (fun ts => ILAlgoTypes.MemEval (ILAlgoTypes.Algos pack (Env.repr types_rV ts)))
                     end
             | _ => match pack with
@@ -611,33 +634,39 @@ Module Extension.
                    end
           end
         in
+        idtac "8" ;
         let nhints := 
           let res := match pack with
-            | tt => constr:(fun ts => @extend_opt_hints _ _ _ None (fwd' ts) (bwd' ts))
-            | _ => red_pack (fun ts => @extend_opt_hints _ _ _ (ILAlgoTypes.Hints (ILAlgoTypes.Algos pack (Env.repr types_rV ts))) (fwd' ts) (bwd' ts))
+            | tt => constr:(fun ts => @extend_opt_hints _ None (fwd' ts) (bwd' ts))
+            | _ => red_pack (fun ts => @extend_opt_hints _ (ILAlgoTypes.Hints (ILAlgoTypes.Algos pack (Env.repr types_rV ts))) (fwd' ts) (bwd' ts))
 (*
 constr:(fun ts => @None (UNF.hintsPayload (Env.repr ILEnv.BedrockCoreEnv.core (Env.repr types_rV ts)) pcT stateT)) *)
           end in
           eval simpl extend_opt_hints in res
         in
+        idtac "9" ;
         let algos := eval cbv beta in
           (fun ts => @ILAlgoTypes.Build_AllAlgos (ILAlgoTypes.PACK.applyTypes env ts) (nprover ts) (nhints ts) (nmevals ts)) in
+        idtac "10" ;
         set (algos_V := algos) ;
         refine ({| ILAlgoTypes.Env := env
                  ; ILAlgoTypes.Algos := algos_V
                  ; ILAlgoTypes.Algos_correct := _
-                |}); 
+                |});
+        idtac "11" ;
     (*TIME stop_timer "extend:combining" ; *)
         abstract (let ts := fresh "ts" in
          let fs := fresh "fs" in
          let ps := fresh "ps" in
          intros ts fs ps ; 
+           idtac "12" ;
          let ntypes := fresh "types" in
          set (ntypes := @ILAlgoTypes.PACK.applyTypes env ts) ;
          let nfuncs := fresh "funcs" in
          set (nfuncs := @ILAlgoTypes.PACK.applyFuncs env ntypes fs) ;
          let npreds := fresh "preds" in
          set (npreds := @ILAlgoTypes.PACK.applyPreds env ntypes ps) ;
+           idtac "13" ;
          constructor ;
          [ match prover with
              | tt => match pack with
@@ -649,15 +678,17 @@ constr:(fun ts => @None (UNF.hintsPayload (Env.repr ILEnv.BedrockCoreEnv.core (E
                       | _ => idtac "NOPE" prover pack
                     end
            end
-         | match goal with
+         | idtac "14" ;
+           match goal with
              | [ |- match ?X with _ => _ end ] =>
                match pack with 
-                 | tt => change (X) with (@extend_opt_hints _ _ _ None (fwd' ntypes) (bwd' ntypes))
+                 | tt => change (X) with (@extend_opt_hints _ None (fwd' ntypes) (bwd' ntypes))
                  | _ => 
-                   (change (X) with (@extend_opt_hints _ _ _ (ILAlgoTypes.Hints (ILAlgoTypes.Algos pack (Env.repr types_rV ts))) (fwd' ntypes) (bwd' ntypes)))
+                   (change (X) with (@extend_opt_hints _ (ILAlgoTypes.Hints (ILAlgoTypes.Algos pack (Env.repr types_rV ts))) (fwd' ntypes) (bwd' ntypes)))
                end; apply extend_opt_hintsOk; [ simpl; auto | HINTS_REIFY.prove fwd | HINTS_REIFY.prove bwd ]
            end
-         | match mevals with
+         | idtac "15" ;
+           match mevals with
              | tt => match pack with
                        | tt => simpl; trivial
                        | _ => eapply (@ILAlgoTypes.Algos_correct pack ntypes nfuncs npreds)
@@ -669,7 +700,27 @@ constr:(fun ts => @None (UNF.hintsPayload (Env.repr ILEnv.BedrockCoreEnv.core (E
       || fail 1000 "Type collection failed! Please report this!"
       ))))))).
 
+(*
+  Ltac isConst x := constr:(false).
+  
+  Definition f (x : nat) : hprop := emp.
+  Theorem foo : forall x, himp (f x) (f x).
+  Proof. reflexivity. Qed.
+
+Ltac prepare fwd bwd := 
+  let the_unfold_tac x := 
+    eval unfold empB, injB, injBX, starB, exB, hvarB in x
+  in
+  ILAlgoTypes.Tactics.Extension.extend the_unfold_tac
+    isConst auto_ext' tt tt fwd bwd.
+
+Definition auto_ext : TypedPackage.
+prepare foo tt.
+*)
+
+
   End Extension.
+
 
   
 

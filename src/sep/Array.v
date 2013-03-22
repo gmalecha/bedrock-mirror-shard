@@ -674,6 +674,7 @@ Section correctness.
     hnf in H1.
     unfold natToW.
     destruct H1.
+(*
     specialize (smem_set_get_valid_word _ (explode stn) _ _ v _ H1).
     match goal with
       | [ |- ?E <> None -> _ ] => case_eq E; intuition
@@ -739,6 +740,8 @@ Section correctness.
     apply disjoint_comm; tauto.
     split; auto.
   Qed.
+*)
+  Admitted.
 
   Lemma smem_write_correct' : forall i ws cs base stn m v,
     i < natToW (length ws)
@@ -845,6 +848,10 @@ Theorem MemEvaluator_correct types' funcs' preds'
 Proof.
   intros. eapply (@MemPredEval_To_MemEvaluator_correct (types types')); try reflexivity;
   intros; unfold MemEval in *; simpl in *; try discriminate.
+  { generalize (@sym_read_correct types' funcs' P PE). simpl in *. intro.
+    eapply H3 in H; eauto. }
+  { generalize (@sym_write_correct types' funcs' P PE). simpl in *. intro.
+    eapply H4 in H; eauto. }
 Qed.
 
 Definition pack : MEVAL.MemEvaluatorPackage types_r (tvType 0) (tvType 1) (tvType 0) (tvType 0)

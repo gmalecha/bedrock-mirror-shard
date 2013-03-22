@@ -1002,8 +1002,12 @@ Theorem MemEvaluator_correct types' funcs' preds'
   (@IL_mem_satisfies (types types')) (@IL_ReadWord (types types')) (@IL_WriteWord (types types'))
   (@IL_ReadByte (types types')) (@IL_WriteByte (types types')).
 Proof.
-  intros. eapply (@MemPredEval_To_MemEvaluator_correct (types types')); simpl; intros; try discriminate.
-  reflexivity.
+  intros. eapply (@MemPredEval_To_MemEvaluator_correct (types types')); try reflexivity;
+  intros; unfold MemEval in *; simpl in *; try discriminate.
+  { generalize (@sym_read_correct (types types') funcs' P PE). simpl in *. intro.
+    eapply H3 in H; eauto. }
+  { generalize (@sym_write_correct (types types') funcs' P PE). simpl in *. intro.
+    eapply H4 in H; eauto. }
 Qed.
 
 Definition pack : MEVAL.MemEvaluatorPackage types_r (tvType 0) (tvType 1) (tvType 0) (tvType 0)

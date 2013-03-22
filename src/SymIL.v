@@ -636,7 +636,6 @@ Section spec_functions.
     Lemma mep_correct : @MEVAL.PredEval.MemEvalPred_correct types pcT stT (IL.settings * IL.state)
       (tvType 0) (tvType 0) IL_mem_satisfies IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte mep pred funcs.
     Proof.
-    Admitted. (*
       constructor; intros; destruct stn_st as [ stn st ];
         match goal with
           | [ H : match ?X with _ => _ end |- _ ] =>
@@ -644,7 +643,7 @@ Section spec_functions.
         end.
 
       { eapply interp_satisfies in H3. think.
-        apply satisfies_star in H4. think.
+        eapply STK.interp_star in H4. think.
         eapply read_pred_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
@@ -654,11 +653,12 @@ Section spec_functions.
 
         revert H; consider (exprD funcs uvars vars ve tvWord); intros; auto.
         unfold IL_ReadWord, ReadWord. simpl.
+        admit. (*
         eapply satisfies_get_word; eauto.
-        eapply split_smem_get_word; eauto. }
+        eapply split_smem_get_word; eauto. *) }
 
       { eapply interp_satisfies in H4. think.
-        apply satisfies_star in H5. think.
+        apply STK.interp_star in H5. think.
         eapply write_pred_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
@@ -670,7 +670,7 @@ Section spec_functions.
           | [ |- match ?X with _ => _ end -> match ?Y with _ => _ end ] =>
             change X with Y; consider Y; intros; auto
         end.
-        revert H8. consider (smem_set_word (explode stn) p v x); try contradiction; intros.
+        revert H8. (*consider (smem_set_word (explode stn) p v x); try contradiction; intros.
         unfold IL_WriteWord, WriteWord in *.
         unfold split in *. intuition.
         eapply split_set_word in H8; eauto. think.
@@ -684,10 +684,10 @@ Section spec_functions.
         eapply smem_set_word_relevant in H14. rewrite <- H14. rewrite <- H11.
           
         eapply mem_set_word_relevant_memoryIn; eauto.
-        rewrite <- H11; apply satisfies_memoryIn. }
+        rewrite <- H11; apply satisfies_memoryIn. *) admit. }
 
       { eapply interp_satisfies in H3. think.
-        apply satisfies_star in H4. think.
+        apply STK.interp_star in H4. think.
         eapply read_pred_byte_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
@@ -700,12 +700,13 @@ Section spec_functions.
         injection H7; clear H7; intros; subst.
         unfold IL_ReadByte, ReadByte. simpl.
         eapply split_smem_get in H4; eauto.
+        (*
         eapply satisfies_get in H4; eauto.
         unfold H.mem_get, ReadByte in H4; rewrite H4.
-        reflexivity. }
+        reflexivity.*) admit. }
 
       { eapply interp_satisfies in H4. think.
-        apply satisfies_star in H5. think.
+        apply STK.interp_star in H5. think.
         eapply write_pred_byte_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
@@ -719,7 +720,7 @@ Section spec_functions.
         end.
         revert H8. consider (smem_set p (WtoB v) x); try contradiction; intros.
         unfold IL_WriteByte, WriteByte in *.
-
+(*
         Lemma smem_set'_present : forall p v ls m m',
           smem_set' ls p v m = Some m'
           -> exists v', smem_get' ls p m = Some v'.
@@ -736,6 +737,7 @@ Section spec_functions.
           -> exists v', smem_get p m = Some v'.
           intros; eapply smem_set'_present; eauto.
         Qed.
+
 
         destruct (smem_set_present _ _ _ H8).
         generalize H5; intro Ho; eapply split_smem_get in Ho; eauto.
@@ -825,8 +827,8 @@ Section spec_functions.
           intros; eapply memoryIn'_join; eauto using H.NoDup_all_addr.
         Qed.
         
-        eauto using memoryIn_join. }
-    Qed. *)
+        eauto using memoryIn_join.*) admit. }
+    Qed.
 
     Variable predIndex : nat.
 

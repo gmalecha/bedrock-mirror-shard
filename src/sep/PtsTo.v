@@ -239,6 +239,10 @@ Module BedrockPtsToEvaluator.
   Proof.
     intros. eapply MemPredEval_To_MemEvaluator_correct; try reflexivity;
     intros; unfold MemEval_ptsto32 in *; simpl in *; try discriminate.
+    { generalize (@sym_read_word_ptsto32_correct types' funcs' P PE). simpl in *. intro.
+      eapply H3 in H; eauto. }
+    { generalize (@sym_write_word_ptsto32_correct types' funcs' P PE). simpl in *. intro.
+      eapply H4 in H; eauto. }
   Qed.
 
   End hide_notation.

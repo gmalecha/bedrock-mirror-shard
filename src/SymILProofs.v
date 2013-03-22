@@ -40,7 +40,6 @@ Module SymIL_Correct.
     Variable PC : ProverT_correct Prover funcs.
 
     Variable meval : MEVAL.MemEvaluator types.
-    Check MEVAL.MemEvaluator_correct.
     Variable meval_correct : MEVAL.MemEvaluator_correct pcT stT meval funcs preds tvWord tvWord
       (@IL_mem_satisfies ts) (@IL_ReadWord ts) (@IL_WriteWord ts) (@IL_ReadByte ts) (@IL_WriteByte ts).
 
@@ -585,8 +584,6 @@ Module SymIL_Correct.
         (f_equal; []) || (f_equal; [ solve [ reflexivity | assumption ] | ] || reflexivity || assumption)) : env_resolution.
       
     Definition NO_MORE_COND : Prop := True.
-
-    Check MEVAL.hook_sound.
 
     Ltac sym_eval_prover IHpath := 
       repeat match goal with
