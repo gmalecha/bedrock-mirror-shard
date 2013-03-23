@@ -50,7 +50,7 @@ Module SymIL_Correct.
     Lemma stateD_interp : forall cs stn_st ss sh,
       stateD funcs preds meta_env vars_env cs stn_st ss ->
       SymMem ss = Some sh ->
-      interp cs (![ MEVAL.SEP.sexprD funcs preds meta_env vars_env (SH.sheapD sh)] stn_st).
+      interp cs (![ SEP.sexprD funcs preds meta_env vars_env (SH.sheapD sh)] stn_st).
     Proof.
       clear. destruct stn_st; destruct ss; destruct SymRegs; destruct p; simpl; intros.
       rewrite H0 in *. intuition.

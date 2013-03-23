@@ -17,7 +17,7 @@ Set Implicit Arguments.
 Set Strict Implicit.
 
 (** The Symbolic Evaluation Interfaces *)
-Module MEVAL := SymEval.SymbolicEvaluator SH.
+Module MEVAL := SymEval.SymbolicEvaluator ST SEP SH.
 
 Section typed.
   Variable types : list type.

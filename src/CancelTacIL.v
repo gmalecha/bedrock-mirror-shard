@@ -9,4 +9,4 @@ Require Import TacPackIL.
 Set Implicit Arguments.
 Set Strict Implicit.
 
-Module CANCEL_LOOP := MirrorShard.CancelLoopTac.CancelLoopTac SepIL.SH TacPackIL.SEP_LEMMA.
+Module CANCEL_LOOP := MirrorShard.CancelLoopTac.CancelLoopTac SepIL.ST SepIL.SEP SepIL.SH TacPackIL.SEP_LEMMA UNF.

@@ -16,14 +16,14 @@ Add Rec LoadPath "/usr/local/lib/coq/user-contrib/" as Timing.
 Add ML Path "/usr/local/lib/coq/user-contrib/". 
 Declare ML Module "Timing_plugin".
 *)
-Module SEP_LEMMA := SepLemma.SepLemma SEP.
+Module SEP_LEMMA := SepLemma.SepLemma ST SEP.
 
-Module UNF := Unfolder.Make SH ExprUnify.UNIFIER SEP_LEMMA.
+Module UNF := Unfolder.Make ST SEP SH ExprUnify.UNIFIER SEP_LEMMA.
 
-Module ILAlgoTypes <: AlgoTypes SEP BedrockCoreEnv.
-  Module PACK := TypedPackage.Make SEP BedrockCoreEnv.
-  Module SEP_REIFY := ReifySepExpr.ReifySepExpr SEP.
-  Module HINTS_REIFY := ReifyHints.Make UNF.SH.SE SEP_LEMMA.
+Module ILAlgoTypes <: AlgoTypes ST SEP BedrockCoreEnv.
+  Module PACK := TypedPackage.Make ST SEP BedrockCoreEnv.
+  Module SEP_REIFY := ReifySepExpr.ReifySepExpr ST SEP.
+  Module HINTS_REIFY := ReifyHints.Make ST SEP SEP_LEMMA.
 
   Record AllAlgos (ts : list type) : Type :=
   { Prover : option (ProverT (repr BedrockCoreEnv.core ts))
@@ -518,7 +518,7 @@ Module Extension.
     induction 1; simpl; intros; auto. constructor; eauto. eapply IHForall. auto.
   Qed.
 
-  Definition extend_opt_hints types (o : option (UNF.hintsPayload types)) (fwd bwd : list (SepLemma.lemma types (UNF.LEM.sepConcl types))) : option (UNF.hintsPayload types) :=
+  Definition extend_opt_hints types (o : option (UNF.hintsPayload types)) (fwd bwd : list (SepLemma.lemma types (SEP_LEMMA.sepConcl types))) : option (UNF.hintsPayload types) :=
     match fwd , bwd with
       | nil , nil => o
       | _ , _ =>
@@ -527,7 +527,7 @@ Module Extension.
           | Some e => Some (UNF.Build_hintsPayload (UNF.Forward e ++ fwd) (UNF.Backward e ++ bwd))
         end
     end.
-  Lemma extend_opt_hintsOk : forall types funcs preds (o : option (UNF.hintsPayload types)) (fwd bwd : list (SepLemma.lemma types (UNF.LEM.sepConcl types))),
+  Lemma extend_opt_hintsOk : forall types funcs preds (o : option (UNF.hintsPayload types)) (fwd bwd : list (SepLemma.lemma types (SEP_LEMMA.sepConcl types))),
     match o with
       | None => True
       | Some H => @UNF.hintsSoundness types funcs preds H

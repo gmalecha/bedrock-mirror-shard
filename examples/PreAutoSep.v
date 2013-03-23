@@ -1322,16 +1322,16 @@ Hint Rewrite lift0 : sepFormula.
 Ltac toFront which H :=
   let rec toFront' P k :=
     match P with
-      | SEP.ST.star ?Q ?R =>
-        toFront' Q ltac:(fun it P' => k it (SEP.ST.star P' R))
-        || toFront' R ltac:(fun it P' => k it (SEP.ST.star P' Q))
+      | ST.star ?Q ?R =>
+        toFront' Q ltac:(fun it P' => k it (ST.star P' R))
+        || toFront' R ltac:(fun it P' => k it (ST.star P' Q))
           || fail 2
-      | _ => which P; k P (@SEP.ST.emp W (settings * state) nil)
+      | _ => which P; k P (@ST.emp W (settings * state) nil)
     end in
     match type of H with
       | interp ?specs (![ ?P ] ?st) => toFront' P ltac:(fun it P' =>
         let H' := fresh in
-          assert (H' : interp specs (![ SEP.ST.star it P' ] st)) by step auto_ext;
+          assert (H' : interp specs (![ ST.star it P' ] st)) by step auto_ext;
             clear H; rename H' into H)
     end.
 

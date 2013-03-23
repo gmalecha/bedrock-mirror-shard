@@ -13,7 +13,7 @@ Export ILTacCommon.
 Set Implicit Arguments.
 Set Strict Implicit.
 
-Module SEP_REIFY := ReifySepExpr.ReifySepExpr SEP.
+Module SEP_REIFY := ReifySepExpr.ReifySepExpr ST SEP.
 
 (** Cancellation **)
 (******************)
@@ -36,7 +36,7 @@ Ltac sep_canceller isConst ext simplifier :=
     end
   in
   match goal with 
-    | [ |- himp ?cs ?L ?R ] =>
+    | [ |- himp ?L ?R ] =>
       let pcT := constr:(W) in
       let stateT := constr:(prod settings state) in
 (*TIME      start_timer "sep_canceler:init"; *)
@@ -52,7 +52,7 @@ Ltac sep_canceller isConst ext simplifier :=
 (*TIME      stop_timer "sep_canceler:unfold_notation" ; *)
 (*TIME      start_timer "sep_canceler:reify" ; *)
       (** collect types **)
-      let Ts := constr:(Reflect.Tnil) in
+      let Ts := constr:(Reify.Tnil) in
        ReifyExpr.collectTypes_exprs ltac:(isConst) pures Ts ltac:(fun Ts => 
       SEP_REIFY.collectTypes_sexpr ltac:(isConst) L Ts ltac:(fun Ts =>
       SEP_REIFY.collectTypes_sexpr ltac:(isConst) R Ts ltac:(fun Ts =>
@@ -188,7 +188,7 @@ Ltac sym_eval isConst ext simplifier :=
 (*TIME                  stop_timer "sym_eval:gather_instrs" ; *)
                   (** collect the raw types **)
 (*TIME                  start_timer "sym_eval:reify" ; *)
-                  let Ts := constr:(Reflect.Tnil) in
+                  let Ts := constr:(Reify.Tnil) in
                   let Ts k := 
                     match SF with
                       | tt => k Ts

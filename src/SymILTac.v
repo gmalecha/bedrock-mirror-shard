@@ -56,7 +56,7 @@ Section unfolder_learnhook.
   (** TODO : move to SymILProofs **)
   Lemma stateD_WellTyped_sheap : forall uvars vars cs stn_st s SymRegs SymPures,
     stateD funcs preds uvars vars cs stn_st {| SymMem := Some s; SymRegs := SymRegs; SymPures := SymPures |} ->
-    SH.WellTyped_sheap (typeof_funcs funcs) (UNF.SH.SE.typeof_preds preds) (typeof_env uvars) (typeof_env vars) s = true.
+    SH.WellTyped_sheap (typeof_funcs funcs) (SEP.typeof_preds preds) (typeof_env uvars) (typeof_env vars) s = true.
   Proof.
     clear. intros. unfold stateD in H.
     destruct stn_st. destruct SymRegs. destruct p. intuition. generalize H. clear; intros.
@@ -158,12 +158,12 @@ Section stream_correctness.
   Qed.
 
   Lemma interp_ex : forall cs T (P : T -> hprop) stn_st,
-    interp cs (![SEP.ST.ex P] stn_st) ->
+    interp cs (![ST.ex P] stn_st) ->
     exists v, interp cs (![P v] stn_st).
   Proof.
     clear. intros.
     rewrite sepFormula_eq in *. destruct stn_st. unfold sepFormula_def in *. simpl in *.
-    unfold SEP.ST.ex in H. apply interp_sound in H. auto.
+    unfold ST.ex in H. apply interp_sound in H. auto.
   Qed.
 
   Lemma interp_pull_existsEach : forall cs P stn_st uvars vars' vars,

@@ -245,16 +245,33 @@ Definition memoryIn : mem -> smem := memoryIn.
 Definition hpropB sos := STK.ihprop sos. 
 Definition HProp := hpropB nil.
 
-Definition empB sos : hpropB sos := STK.iemp _.
-Notation "'Emp'" := (empB _) : Sep_scope.
+Definition empB {sos} : hpropB sos := 
+  match sos as sos return hpropB sos with
+    | nil => ST.emp
+    | sos => @STK.iemp sos
+  end.
 
-Definition injB sos (P : Prop) : hpropB sos := STK.iinj sos P.
+Arguments empB {_} _ _ : simpl never.
 
-Notation "[| P |]" := (injB _ P) : Sep_scope.
+Notation "'Emp'" := (@empB _) : Sep_scope.
 
-Definition injBX sos (P : propX W (settings * state) sos) : hpropB sos := STK.iinjX P.
+Definition injB {sos} : Prop -> hpropB sos :=
+  match sos as sos return Prop -> hpropB sos with
+    | nil => ST.inj 
+    | sos => @STK.iinj sos
+  end.
 
-Notation "[|| P ||]" := (injBX P) : Sep_scope.
+Arguments injB {_} _ _ _ : simpl never.
+
+Notation "[| P |]" := (@injB _ P) : Sep_scope.
+
+Definition injBX {sos} : (propX W (settings * state) sos) -> hpropB sos :=
+  match sos as sos return (propX W (settings * state) sos) -> hpropB sos with
+    | nil => STK.injX
+    | sos => @STK.iinjX sos
+  end.
+
+Notation "[|| P ||]" := (@injBX _ P) : Sep_scope.
 
 Definition ptsto8 sos : W -> B -> hpropB sos := STK.ihptsto sos.
 
@@ -280,9 +297,15 @@ Definition ptsto32 sos (a v : W) : hpropB sos :=
 
 Notation "a =*> v" := (ptsto32 _ a v) (no associativity, at level 39) : Sep_scope.
 
-Definition starB sos : hpropB sos -> hpropB sos -> hpropB sos := @STK.istar sos.
+Definition starB sos : hpropB sos -> hpropB sos -> hpropB sos := 
+  match sos as sos return hpropB sos -> hpropB sos -> hpropB sos with
+    | nil => ST.star
+    | sos => @STK.istar sos
+  end.
 
-Infix "*" := starB : Sep_scope.
+Arguments starB {_} _ _ _ _ : simpl never.
+
+Notation "a * b" := (@starB _ a b) : Sep_scope.
 
 Delimit Scope Sep_scope with Sep.
 
@@ -301,7 +324,11 @@ Fixpoint ptsto32m sos (a : W) (offset : nat) (vs : list W) : hpropB sos :=
 
 Notation "a ==*> v1 , .. , vn" := (ptsto32m _ a O (cons v1 .. (cons vn nil) ..)) (no associativity, at level 39) : Sep_scope.
 
-Definition exB sos T (p : T -> hpropB sos) : hpropB sos := STK.iex p.
+Definition exB sos : forall T, (T -> hpropB sos) -> hpropB sos := 
+  match sos as sos return forall T, (T -> hpropB sos) -> hpropB sos with
+    | nil => ST.ex
+    | sos => @STK.iex sos
+  end.
 
 Notation "'Ex' x , p" := (exB (fun x => p)) : Sep_scope.
 Notation "'Ex' x : A , p" := (exB (fun x : A => p)) : Sep_scope.
@@ -335,7 +362,7 @@ Fixpoint lift sos (p : HProp) : hpropB sos :=
 Notation "^[ p ]" := (lift _ p) : Sep_scope.
 
 Definition Himp (p1 p2 : HProp) : Prop :=
-  STK.himp p1 p2.
+  ST.himp p1 p2.
 
 Notation "p1 ===> p2" := (Himp p1%Sep p2%Sep) (no associativity, at level 90).
 
@@ -394,37 +421,44 @@ Qed.
 Hint Rewrite subst_sepFormula : sepFormula.
 
 Theorem substH_inj : forall sos P p,
-  substH (injB sos P) p = injB _ P.
-  reflexivity.
+  substH (injB (sos := sos) P) p = injB P.
+Proof. 
+  intros; destruct sos; [ reflexivity | destruct sos; reflexivity ].
 Qed.
 
 Theorem substH_injX : forall sos P p,
   substH (injBX (sos := sos) P) p = injBX (subst P p).
-  reflexivity.
+Proof.
+  intros; destruct sos; [ reflexivity | destruct sos; reflexivity ].
 Qed.
 
 Theorem substH_ptsto8 : forall sos a v p,
   substH (ptsto8 sos a v) p = ptsto8 _ a v.
-  reflexivity.
+Proof.
+  intros; destruct sos; [ reflexivity | destruct sos; reflexivity ].
 Qed.
 
 Theorem substH_ptsto32 : forall sos a v p,
   substH (ptsto32 sos a v) p = ptsto32 _ a v.
-  reflexivity.
+Proof.
+  intros; destruct sos; [ reflexivity | destruct sos; reflexivity ].
 Qed.
 
 Theorem substH_star : forall sos (p1 p2 : hpropB sos) p3,
   substH (starB p1 p2) p3 = starB (substH p1 p3) (substH p2 p3).
-  reflexivity.
+Proof.
+  intros; destruct sos; [ reflexivity | destruct sos; reflexivity ].
 Qed.
 
 Theorem substH_ex : forall sos A (p1 : A -> hpropB sos) p2,
   substH (exB p1) p2 = exB (fun x => substH (p1 x) p2).
-  reflexivity.
+Proof.
+  intros; destruct sos; [ reflexivity | destruct sos; reflexivity ].
 Qed.
 
 Theorem substH_hvar : forall sos (x : settings * smem -> propX W (settings * state) sos) p,
   substH (hvarB x) p = hvarB (fun m => subst (x m) p).
+Proof.
   reflexivity.
 Qed.
 
@@ -513,7 +547,7 @@ Coercion natToByte : nat >-> B.
 (* *)
 Require MirrorShard.SepExpr MirrorShard.SepHeap.
 Module SEP := SepExpr.Make ST.
-Module SH := SepHeap.Make SEP.
+Module SH := SepHeap.Make ST SEP.
 
 (** This relies on the fact that I'm using PropX **)
 Lemma sheapD_pures : forall ts funcs preds cs U G stn sm h,

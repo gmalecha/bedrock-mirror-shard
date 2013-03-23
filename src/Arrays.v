@@ -20,9 +20,9 @@ Hint Rewrite upd_length updN_length : sepFormula.
 Inductive containsArray : HProp -> list W -> Prop :=
 | CABase : forall ls p, containsArray (array ls p) ls
 | CALeft : forall P Q ls, containsArray P ls
-  -> containsArray (SEP.ST.star P Q) ls
+  -> containsArray (ST.star P Q) ls
 | CARight : forall P Q ls, containsArray Q ls
-  -> containsArray (SEP.ST.star P Q) ls
+  -> containsArray (ST.star P Q) ls
 | CAUpd : forall P ls a v, containsArray P (upd ls a v)
   -> containsArray P ls.
 

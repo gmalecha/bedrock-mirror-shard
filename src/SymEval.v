@@ -11,9 +11,7 @@ Require Import MirrorShard.Prover.
 Set Implicit Arguments.
 Set Strict Implicit.
 
-Module SymbolicEvaluator (SH : SepHeap).
-  Module SEP := SH.SE.
-  Module ST := SEP.ST.
+Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHeap ST SEP).
 
   (** Learn hook
    ** - This is the bit of code that gets run when new pure facts are
@@ -231,7 +229,7 @@ Module SymbolicEvaluator (SH : SepHeap).
    **   until I know what [valT] refers to.
    **)
   Module PredEval.
-    Module SF := SepExpr.SepExprFacts SEP.
+    Module SF := SepExpr.SepExprFacts ST SEP.
 
     Section typed.
       Variable types : list type.
