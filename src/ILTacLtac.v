@@ -9,9 +9,12 @@ Require Import Word Memory.
 Require Import Env.
 
 Export ILTacCommon.
+Require Import Evm_compute.
 
 Set Implicit Arguments.
 Set Strict Implicit.
+
+Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right associativity).
 
 Module SEP_REIFY := ReifySepExpr.ReifySepExpr ST SEP.
 
@@ -20,111 +23,102 @@ Module SEP_REIFY := ReifySepExpr.ReifySepExpr ST SEP.
 (** The parameters are the following.
  ** - [isConst] is an ltac [* -> bool]
  ** - [ext] is a [TypedPackage .. .. .. .. ..]
- ** - [simplifier] is an ltac that simplifies the goal after the cancelation, it is passed
- **   constr:(tt).
  **)
-Ltac sep_canceller isConst ext simplifier :=
-(*TIME  start_timer "sep_canceler:change_to_himp" ; *)
-  (try change_to_himp) ;
-(*TIME  stop_timer "sep_canceler:change_to_himp" ; *)
-(*TIME  start_timer "sep_canceler:init" ; *)
-  let ext' := 
-    match ext with
-      | tt => eval cbv delta [ ILAlgoTypes.BedrockPackage.bedrock_package ] in ILAlgoTypes.BedrockPackage.bedrock_package
-      | _ => eval cbv delta [ ext ] in ext
-      | _ => ext
-    end
-  in
-  match goal with 
-    | [ |- himp ?L ?R ] =>
-      let pcT := constr:(W) in
-      let stateT := constr:(prod settings state) in
-(*TIME      start_timer "sep_canceler:init"; *)
-(*TIME      start_timer "sep_canceler:gather_props" ; *)
-      let all_props := 
-        ReifyExpr.collect_props ltac:(ILTacCommon.reflectable shouldReflect)
-      in
-      let pures := ReifyExpr.props_types all_props in
-(*TIME      stop_timer "sep_canceler:gather_props" ; *)
-(*TIME      start_timer "sep_canceler:unfold_notation" ; *)
-      let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
-      let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in
-(*TIME      stop_timer "sep_canceler:unfold_notation" ; *)
-(*TIME      start_timer "sep_canceler:reify" ; *)
-      (** collect types **)
-      let Ts := constr:(Reify.Tnil) in
-       ReifyExpr.collectTypes_exprs ltac:(isConst) pures Ts ltac:(fun Ts => 
-      SEP_REIFY.collectTypes_sexpr ltac:(isConst) L Ts ltac:(fun Ts =>
-      SEP_REIFY.collectTypes_sexpr ltac:(isConst) R Ts ltac:(fun Ts =>
-      (** check for potential universe inconsistencies **)
-      match Ts with
-        | context [ PropX.PropX ] => 
-          fail 1000 "found PropX in types list"
-            "(this causes universe inconsistencies)" Ts
-        | context [ PropX.spec ] => 
-          fail 1000 "found PropX in types list"
-            "(this causes universe inconsistencies)" Ts
-        | _ => idtac 
-      end ;
-      (** elaborate the types **)
-      let types_ := 
-        reduce_repr ext tt (ILAlgoTypes.PACK.applyTypes (ILAlgoTypes.Env ext) nil)
-      in
-      let types_ := ReifyExpr.extend_all_types Ts types_ in
-      let typesV := fresh "types" in
-      pose (typesV := types_);
-      (** build the variables **)
-      let uvars := eval simpl in (@nil _ : Expr.env typesV) in
-      let gvars := uvars in
-      let vars := eval simpl in (@nil Expr.tvar) in
-      (** build the funcs **)
-      let funcs := reduce_repr ext tt (ILAlgoTypes.PACK.applyFuncs (ILAlgoTypes.Env ext) typesV nil) in
-      let pcT := constr:(Expr.tvType 0) in
-      let stT := constr:(Expr.tvType 1) in
-      (** build the base sfunctions **)
-      let preds := reduce_repr ext tt (ILAlgoTypes.PACK.applyPreds (ILAlgoTypes.Env ext) typesV nil) in
-      ReifyExpr.reify_exprs ltac:(isConst) pures typesV funcs uvars vars ltac:(fun uvars funcs pures =>
-      let proofs := ReifyExpr.props_proof all_props in
-      SEP_REIFY.reify_sexpr ltac:(isConst) L typesV funcs pcT stT preds uvars vars ltac:(fun uvars funcs preds L =>
-      SEP_REIFY.reify_sexpr ltac:(isConst) R typesV funcs pcT stT preds uvars vars ltac:(fun uvars funcs preds R =>
-(*TIME        stop_timer "sep_canceler:reify" ; *)
-(*TIME        start_timer "sep_canceler:pose" ; *)
-        let funcsV := fresh "funcs" in
-        pose (funcsV := funcs) ;
-        let predsV := fresh "preds" in
-        pose (predsV := preds) ;
-(*TIME          stop_timer "sep_canceler:pose" ; *)
-(*TIME          start_timer "sep_canceler:apply_CancelSep" ; *)
-        (((** TODO: for some reason the partial application to proofs doesn't always work... **)
-         apply (@ApplyCancelSep typesV funcsV predsV 
-                   (ILAlgoTypes.Algos ext typesV)
-                   (@ILAlgoTypes.Algos_correct ext typesV funcsV predsV) uvars pures L R); 
-           [ solve [ apply proofs ] | compute; reflexivity | ]
-(*TIME       ;  stop_timer "sep_canceler:apply_CancelSep" *)
- )
-        || (idtac "failed to apply, generalizing instead!" ;
-            let algos := constr:(ILAlgoTypes.Algos ext typesV) in
-            idtac "-" ;
-            let algosC := constr:(@ILAlgoTypes.Algos_correct ext typesV funcsV predsV) in 
-            idtac "*" ;
-            first [ generalize (@ApplyCancelSep typesV funcsV predsV algos algosC uvars pures L R) ; idtac "p"
-                  | generalize (@ApplyCancelSep typesV funcsV predsV algos algosC uvars pures L)  ; idtac "o" 
-                  | generalize (@ApplyCancelSep typesV funcsV predsV algos algosC uvars pures) ; idtac "i"
-                  | generalize (@ApplyCancelSep typesV funcsV predsV algos algosC uvars) ; idtac "u"
-                  | generalize (@ApplyCancelSep typesV funcsV predsV algos algosC) ; pose (uvars) ; idtac "y" 
-                  | generalize (@ApplyCancelSep typesV funcsV predsV); pose (algosC) ; idtac "r" 
-                  | generalize (@ApplyCancelSep typesV funcsV) ; idtac "q"
-                  ])) ;
-(*TIME          start_timer "sep_canceler:simplify" ; *)
-           first [ simplifier typesV funcsV predsV tt | fail 100000 "canceler: simplifier failed" ] ;
-(*TIME          stop_timer "sep_canceler:simplify" ; *)
-(*TIME          start_timer "sep_canceler:clear" ; *)
-           try clear typesV funcsV predsV
-(*TIME        ;  stop_timer "sep_canceler:clear"  *)
-        ))))))
-    | [ |- ?G ] => 
-      idtac "no match" G 
-  end.
+Ltac sep_canceller isConst ext :=
+  try change_to_himp;
+  (let ext' :=
+    (match ext with
+       | tt =>
+         eval
+         cbv delta [TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package] in
+           TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package
+       | _ => eval cbv delta [ext] in ext
+       | _ => ext
+     end) in
+    match goal with
+      | |- himp ?L ?R =>
+          let pcT := constr:W in
+          let stateT := constr:(prod settings state) in
+          let all_props :=
+           ReifyExpr.collect_props ltac:(reflectable ltac:shouldReflect) in
+          let pures := ReifyExpr.props_types all_props in
+          let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
+          let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in
+          let Ts := constr:Reify.Tnil in
+          ReifyExpr.collectTypes_exprs isConst pures Ts ltac:(fun Ts =>
+            SEP_REIFY.collectTypes_sexpr isConst L Ts ltac:(fun Ts =>
+              SEP_REIFY.collectTypes_sexpr isConst R Ts ltac:(fun Ts =>
+                match Ts with
+                  | context [PropX.PropX] =>
+                    fail 1000 "found PropX in types list"
+                              "(this causes universe inconsistencies)" Ts
+                  | context [PropX.spec] =>
+                    fail 1000 "found PropX in types list"
+                              "(this causes universe inconsistencies)" Ts
+                  | _ => idtac
+                end;
+                let types_ :=
+                  reduce_repr ext tt
+                  (TacPackIL.ILAlgoTypes.PACK.applyTypes
+                    (TacPackIL.ILAlgoTypes.Env ext)
+                    (@nil _)) in
+                let types_ := ReifyExpr.extend_all_types Ts types_ in
+                let typesV := fresh "types" in
+                pose (typesV := types_);
+                let uvars := constr:(@nil (sigT (Expr.tvarD typesV))) in
+                let gvars := uvars in
+                let vars  := constr:(@nil Expr.tvar) in
+                let funcs :=
+                  reduce_repr ext tt
+                  (TacPackIL.ILAlgoTypes.PACK.applyFuncs
+                    (TacPackIL.ILAlgoTypes.Env ext)
+                    typesV 
+                    (@nil _)) in
+                let pcT := constr:(Expr.tvType O) in
+                let stT := constr:(Expr.tvType (S O)) in
+                let preds :=
+                  reduce_repr ext tt
+                  (TacPackIL.ILAlgoTypes.PACK.applyPreds
+                    (TacPackIL.ILAlgoTypes.Env ext)
+                    typesV 
+                    (@nil _)) in
+                ReifyExpr.reify_exprs isConst pures typesV funcs uvars vars ltac:(fun uvars funcs pures =>
+                  let proofs := ReifyExpr.props_proof all_props in
+                  SEP_REIFY.reify_sexpr isConst L typesV funcs pcT stT preds uvars vars ltac:(fun uvars funcs preds L =>
+                    SEP_REIFY.reify_sexpr isConst R typesV funcs pcT stT preds uvars vars ltac:(fun uvars funcs preds R =>
+                      let funcsV := fresh "funcs" in
+                      pose (funcsV := funcs);
+                      let predsV := fresh "preds" in
+                      pose (predsV := preds);
+                      let puresV := fresh "pures" in
+                      pose (puresV := pures) ;
+                      let puresPfV := fresh "pures_proof" in
+                      assert (puresPfV : Expr.AllProvable funcsV uvars nil puresV) by
+                        (cbv beta iota zeta delta 
+                          [ Expr.AllProvable Expr.AllProvable_gen Expr.Provable puresV 
+                            Expr.exprD nth_error funcsV value error 
+                            Expr.Range Expr.Domain Expr.Denotation 
+                            Expr.EqDec_tvar Expr.applyD equiv_dec 
+                            Expr.tvar_rec Expr.tvar_rect sumbool_rec sumbool_rect
+                            Peano_dec.eq_nat_dec nat_rec nat_rect eq_rec_r eq_rect eq_rec 
+                            f_equal eq_sym ]; exact proofs ) ; 
+                      change (SEP.himp funcsV predsV uvars nil L R) ;
+                      apply (@ApplyCancelSep_slice typesV funcsV predsV 
+                        (TacPackIL.ILAlgoTypes.Algos ext typesV)
+                        (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
+                        uvars L R puresV puresPfV); 
+                      (let bl := constr:(ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
+                       let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+                       let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+                       subst funcsV predsV  ;
+                       evm computed_blacklist [ bl ];
+                       clear typesV puresV puresPfV ;
+                       match goal with
+                         | |- ?G => let H := fresh in assert (H : G); [ intros | apply H ]
+                       end)))))))
+      | |- ?G => idtac "no match" G
+    end).
+
 
 (** Symbolic Execution **)
 (************************)

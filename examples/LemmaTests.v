@@ -7,209 +7,8 @@ Require Import PreAutoSep.
 
 Hint Extern 1 => elimtype False; omega : contradiction.
 
-Ltac sep_canceller isConst ext simplifier :=
-  try change_to_himp;
-   (let ext' :=
-     (match ext with
-      | tt =>
-          eval
-           cbv delta [TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package] in
-          TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package
-      | _ => eval cbv delta [ext] in ext
-      | _ => ext
-      end) in
-    match goal with
-    | |- himp ?L ?R =>
-          let pcT := constr:W in
-          let stateT := constr:(prod settings state) in
-          let all_props :=
-           ReifyExpr.collect_props ltac:(reflectable ltac:shouldReflect) in
-          let pures := ReifyExpr.props_types all_props in
-          let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
-          let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in
-          let Ts := constr:Reify.Tnil in
-          ReifyExpr.collectTypes_exprs isConst pures Ts
-           ltac:(fun Ts =>
-                   SEP_REIFY.collectTypes_sexpr isConst L Ts
-                    ltac:(fun Ts =>
-                            SEP_REIFY.collectTypes_sexpr isConst R Ts
-                             ltac:(fun Ts =>
-                                     match Ts with
-                                     | context [PropX] =>
-                                         fail 1000
-                                          "found PropX in types list"
-                                          "(this causes universe inconsistencies)"
-                                          Ts
-                                     | context [PropX.spec] =>
-                                         fail 1000
-                                          "found PropX in types list"
-                                          "(this causes universe inconsistencies)"
-                                          Ts
-                                     | _ => idtac
-                                     end;
-                                      (let types_ :=
-                                        reduce_repr ext tt
-                                         (TacPackIL.ILAlgoTypes.PACK.applyTypes
-                                            (TacPackIL.ILAlgoTypes.Env ext)
-                                            (@nil _)) in
-                                       let types_ :=
-                                        ReifyExpr.extend_all_types Ts types_ in
-                                       let typesV := fresh "types" in
-                                       pose (typesV := types_);
-                                        (let uvars :=
-                                          eval simpl in
-                                          (@nil _:Expr.env typesV) in
-                                         let gvars := uvars in
-                                         let vars :=
-                                          eval simpl in (@nil Expr.tvar) in
-                                         let funcs :=
-                                          reduce_repr ext tt
-                                           (TacPackIL.ILAlgoTypes.PACK.applyFuncs
-                                              (TacPackIL.ILAlgoTypes.Env ext)
-                                              typesV 
-                                              (@nil _)) in
-                                         let pcT := constr:(Expr.tvType O) in
-                                         let stT :=
-                                          constr:(Expr.tvType (S O)) in
-                                         let preds :=
-                                          reduce_repr ext tt
-                                           (TacPackIL.ILAlgoTypes.PACK.applyPreds
-                                              (TacPackIL.ILAlgoTypes.Env ext)
-                                              typesV 
-                                              (@nil _)) in
-                                         ReifyExpr.reify_exprs isConst pures
-                                          typesV funcs uvars vars
-                                          ltac:(fun uvars funcs pures =>
-                                                  let proofs :=
-                                                  ReifyExpr.props_proof
-                                                  all_props in
-                                                  SEP_REIFY.reify_sexpr
-                                                  isConst L typesV funcs pcT
-                                                  stT preds uvars vars
-                                                  ltac:(
-                                                  fun uvars funcs preds L =>
-                                                  SEP_REIFY.reify_sexpr
-                                                  isConst R typesV funcs pcT
-                                                  stT preds uvars vars
-                                                  ltac:(
-                                                  fun uvars funcs preds R =>
-                                                    idtac "HERE" ;
-                                                  let funcsV := fresh "funcs" in
-                                                  pose (funcsV := funcs);
-                                                  (let predsV := fresh
-                                                  "preds" in
-                                                  pose (predsV := preds);
-                                                  (apply
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV
-                                                  (TacPackIL.ILAlgoTypes.Algos
-                                                  ext typesV)
-                                                  (@TacPackIL.ILAlgoTypes.Algos_correct
-                                                  ext typesV funcsV predsV)
-                                                  uvars pures L R);
-                                                  [ solve
-                                                  [ apply proofs ]
-                                                  | 
-                                                  compute; reflexivity
-                                                  | idtac ]) ||
-                                                  (idtac
-                                                  "failed to apply, generalizing instead!";
-                                                  (let algos :=
-                                                  constr:
-                                                  (TacPackIL.ILAlgoTypes.Algos
-                                                  ext typesV) in
-                                                  idtac "-";
-                                                  (let algosC :=
-                                                  constr:
-                                                  (@TacPackIL.ILAlgoTypes.Algos_correct
-                                                  ext typesV funcsV predsV) in
-                                                  idtac "*"; 
-                                                    pose algos ;
-                                                      pose algosC ;
-                                                        pose uvars ; 
-                                                          pose L ;
-                                                            pose R ; pose pures
-                                                            
-(* (first
-                                                  [ 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV algos algosC
-                                                  uvars pures L R); idtac "p"
-                                                  | 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV algos algosC
-                                                  uvars pures L); idtac "o"
-                                                  | 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV algos algosC
-                                                  uvars pures); idtac "i"
-                                                  | 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV algos algosC
-                                                  uvars); idtac "u"
-                                                  | 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV algos algosC);
-                                                  pose uvars; idtac "y"
-                                                  | 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV predsV); 
-                                                  pose algosC; idtac "r"
-                                                  | 
-                                                  generalize
-                                                  (@ApplyCancelSep typesV
-                                                  funcsV); idtac "q" ])
-*)
-)));
-                                                  (first
-                                                  [ 
-                                                  simplifier typesV funcsV
-                                                  predsV tt
-                                                  | 
-                                                  fail 100000
-                                                  "canceler: simplifier failed" ]);
-                                                  try
-                                                  clear typesV funcsV predsV)))))))))
-    | |- ?G => idtac "no match" G
-    end).
-
 Theorem t0 : forall a b, a =*> b ===> a =*> b.
-  intros. unfold Himp.
-  sep_canceller ltac:isConst auto_ext ltac:(hints_ext_simplifier auto_ext).
-  assert (Expr.AllProvable funcs l nil l0). compute. exact I.
-  eapply (@ApplyCancelSep_with_eq2 types funcs preds a0 a1 l s s0 l0 H).
-  
-  Set Printing Implicit.
-  compute. reflexivity.
-  subst a0 l s s0 l0.
-  unfold auto_ext, TacPackIL.ILAlgoTypes.Algos.
-  simpl.
-  unfold CancelTacIL.CANCEL_LOOP.cancel. unfold SH.hash.
-  simpl. unfold CancelTacIL.CANCEL_LOOP.CANCEL_TAC.canceller.
-  Print CancelTacIL.CANCEL_LOOP.CANCEL.sepCancel.
-  hnf. unfold CancelTacIL.CANCEL_LOOP.cancelLoop.
-  hnf. unfold CancelTacIL.CANCEL_LOOP.UNF_TAC.unfold.
-  hnf. unfold TacPackIL.UNF.refineForward.
-  hnf. unfold TacPackIL.UNF.forward.
-  unfold TacPackIL.UNF.unfoldForward.
-  unfold TacPackIL.UNF.find. 
-  hnf. unfold SH.hash. 
-
-
-  Require Import Evm_compute.
-  compute.
-  clear. subst a0 l s s0 l0.
-  simpl. unfold CancelTacIL.CANCEL_LOOP.cancel.
-  unfold SH.hash. simpl. compute.
-
-  compute.
-  evm.
+(*  intros.  ILTacCommon.change_to_himp. sep_canceller ltac:(fun x => false) auto_ext.  *)
   sepLemma.
 Qed.
 
@@ -257,8 +56,100 @@ Theorem t8 : forall p1 P2 V, exists p2, exists v,
   sepLemma.
 Qed.
 
+(*
+Ltac sep_canceller isConst ext :=
+  try ILTacCommon.change_to_himp;
+   (let ext' :=
+     (match ext with
+      | tt =>
+          eval
+           cbv delta [TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package] in
+          TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package
+      | _ => eval cbv delta [ext] in ext
+      | _ => ext
+      end) in
+    match goal with
+      | [ |- himp ?L ?R ] =>
+          (let types :=
+           ILTacCommon.reduce_repr ext tt
+            (TacPackIL.ILAlgoTypes.PACK.applyTypes
+               (TacPackIL.ILAlgoTypes.Env ext) nil) in
+          let funcs :=
+           ILTacCommon.reduce_repr ext tt
+            (TacPackIL.ILAlgoTypes.PACK.applyFuncs
+               (TacPackIL.ILAlgoTypes.Env ext) types
+               (Env.repr (ILEnv.bedrock_funcs_r types) nil)) in
+          let preds :=
+           ILTacCommon.reduce_repr ext tt
+            (TacPackIL.ILAlgoTypes.PACK.applyPreds
+               (TacPackIL.ILAlgoTypes.Env ext) types nil) in
+          let all_props :=
+           ReifyExpr.collect_props
+            ltac:(ILTacCommon.reflectable ltac:ILTacCommon.shouldReflect) in
+          let pures := all_props in
+          let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
+          let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in
+          let k := (fun typesV funcsV uvars predsV L R pures proofs =>
+            idtac typesV funcsV uvars predsV pures proofs ;
+           (let funcs := eval cbv delta [funcsV] in funcsV in
+            let preds := eval cbv delta [predsV] in predsV in
+            let puresV := fresh "pures" in
+            pose (puresV := pures) ;
+              idtac "0" ;
+            let puresPfV := fresh "pures_proof" in
+            assert (Expr.AllProvable funcsV uvars nil puresV) 
+             as puresPfV
+             by (cbv beta iota zeta
+                  delta [Expr.AllProvable Expr.AllProvable_gen Expr.Provable
+                        puresV Expr.exprD nth_error funcsV value error
+                        Expr.Range Expr.Domain Expr.Denotation
+                        Expr.EqDec_tvar Expr.applyD equiv_dec Expr.tvar_rec
+                        Expr.tvar_rect sumbool_rec sumbool_rect eq_nat_dec
+                        nat_rec nat_rect eq_rec_r eq_rect eq_rec f_equal
+                        eq_sym]; exact proofs);
+             idtac "1" ;
+             change (SEP.himp funcsV predsV uvars nil L R);
+               idtac "2" ;
+             apply (@ILTacCommon.ApplyCancelSep_slice typesV funcsV predsV 
+          (TacPackIL.ILAlgoTypes.Algos ext typesV)
+          (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
+          uvars L R puresV puresPfV) ;
+              idtac "3" ;
+             (let bl :=
+               constr:(Evm_compute.Bcons _ ex
+                         (Evm_compute.Bcons _ emp
+                         (Evm_compute.Bcons _ star
+                               (Evm_compute.Bcons _ inj
+                                  (Evm_compute.Bcons _ himp Evm_compute.Bnil))))) in
+              let bl :=
+               ILTacCommon.add_bl
+                ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+              let bl :=
+               ILTacCommon.add_bl
+                ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+                idtac "4" ;
+              subst funcsV predsV; 
+                idtac "5" ; evm computed_blacklist [ bl ];
+                idtac "6" ;
+               clear typesV puresV puresPfV;
+                 idtac "7" ;
+               match goal with
+               | |- ?G => idtac "8" ;
+                     let H := fresh in
+                       idtac "9" ;
+                     (assert G as H; [ intros | idtac "10" ; exact H ]); idtac "11" 
+               end))) in
+          ((sep_canceler_plugin types funcs preds pures L R k) ||
+            fail 10000 "sep_canceler_plugin failed"))
+      | [ |- ?G ] => idtac "no match" G
+    end).
+*)
+
+(*
 Theorem t_err : forall a b c d, a =*> c * b =*> d ===> a =*> b * c =*> d.
   intros.
-  progress sep_canceller ltac:ILTacCommon.isConst auto_ext ltac:(hints_ext_simplifier auto_ext).
-  (progress sep_canceller ltac:ILTacCommon.isConst auto_ext ltac:(hints_ext_simplifier auto_ext); fail 3) || idtac.
+  progress sep_canceller ltac:ILTacCommon.isConst auto_ext.
+  sep_canceller ltac:ILTacCommon.isConst auto_ext.
+  (progress sep_canceller ltac:ILTacCommon.isConst auto_ext; fail 3) || idtac.
 Abort.
+*)

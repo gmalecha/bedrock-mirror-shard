@@ -117,7 +117,7 @@ Ltac sep_firstorder := sep_easy;
            | [ |- _ /\ _ ] => split
            | [ |- forall x, _ ] => intro
            | [ |- _ = _ ] => reflexivity
-           | [ |- himp _ _ _ ] => reflexivity
+           | [ |- himp _ _ ] => reflexivity
              || (apply frame_reflexivity; try match goal with
                                                 | [ |- _ = ?X ] => instantiate (1 := X)
                                               end; apply refl_equal)
@@ -900,11 +900,12 @@ Ltac hints_ext_simplifier hints := fun s1 s2 s3 H =>
        ] in H
   end; refold.
 
-Ltac clear_junk := repeat match goal with
-                            | [ H : True |- _ ] => clear H
-                            | [ H : ?X = ?X |- _ ] => clear H
-                                | [ H : ?X, H' : ?X |- _ ] => clear H'
-                          end.
+Ltac clear_junk :=
+  repeat match goal with
+           | [ H : True |- _ ] => clear H
+           | [ H : ?X = ?X |- _ ] => clear H
+           | [ H : ?X, H' : ?X |- _ ] => clear H'
+         end.
 
 Ltac evaluate ext :=
   repeat match goal with
@@ -913,7 +914,10 @@ Ltac evaluate ext :=
   ILTac.sym_eval ltac:(ILTacCommon.isConst) ext ltac:(hints_ext_simplifier ext);
   clear_junk.
 
-Ltac cancel ext := sep_canceller ltac:(ILTacCommon.isConst) ext ltac:(hints_ext_simplifier ext); sep_firstorder; clear_junk.
+Ltac cancel ext := 
+  sep_canceller ltac:(ILTacCommon.isConst) ext;
+  sep_firstorder;
+  clear_junk.
 
 Ltac unf := unfold substH.
 Ltac reduce := Programming.reduce unf.

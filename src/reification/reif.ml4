@@ -258,10 +258,10 @@ module Bedrock = struct
 
   let pp_uvar fmt (v,t) = Format.fprintf fmt "%a:%a" pp_constr v pp_rtype t
     
-  let tvar = lazy (Extlib.init_constant ["Bedrock"; "Expr"] "tvar")
+  let tvar = lazy (Extlib.init_constant ["MirrorShard"; "Expr"] "tvar")
   let mk_tvar : int option ->  Term.constr = 
-    let tvProp = lazy (Extlib.init_constant ["Bedrock" ; "Expr"] "tvProp") in 
-    let tvType = lazy (Extlib.init_constant ["Bedrock" ; "Expr"] "tvType") in 
+    let tvProp = lazy (Extlib.init_constant ["MirrorShard" ; "Expr"] "tvProp") in 
+    let tvType = lazy (Extlib.init_constant ["MirrorShard" ; "Expr"] "tvType") in 
       fun r -> 
 	match r with 
 	  | Some x -> tvType @@ [| Extlib.Nat.of_int x |] 
@@ -270,13 +270,13 @@ module Bedrock = struct
 
 
   module ReificationHint = struct
-    let path = ["Bedrock" ; "Expr" ; "ReificationHint"]
+    let path = ["MirrorShard" ; "Expr" ; "ReificationHint"]
     let pkg = lazy (Extlib.init_constant path "Pkg")
     let mk_pkg = lazy (Extlib.init_constant path "mk_Pkg")
     let mk_pkg (t : Term.types) : Term.constr = 
       mk_pkg @@ [| t |]
     
-    let path = ["Bedrock" ; "ReifyExpr"]
+    let path = ["MirrorShard" ; "ReifyExpr"]
     (** * Checks if there is a reification hint associated with the type [t], and builds a [type]  *)
     let build_default_type env evar  (ty : Term.constr) : Term.constr = 
       try 
@@ -312,16 +312,18 @@ module Bedrock = struct
       
     let pose gl renv 
 	(k : Term.constr -> Term.constr ->Term.constr ->Term.constr -> Proof_type.tactic) = 
+(*
       let pc_type = mk_tvar (Some 0) in 
       let state_type = mk_tvar (Some 1) in 
+*)
       let tvar = Lazy.force tvar in 
-      let ty = Extlib.init_constant ["Bedrock"; "Expr"] "type" in
+      let ty = Extlib.init_constant ["MirrorShard"; "Expr"] "type" in
       let types = Extlib.List.of_list ty  (List.map snd renv.types) in 
       debug_type_gl gl types "pose/types"; 
       Extlib.cps_mk_letin "types" types (fun types gl ->      		
 	(* Functions *)
-	let ty = Extlib.init_constant ["Bedrock"; "Expr"] "signature" in
-	let mk = Extlib.init_constant ["Bedrock"; "Expr"] "Sig" in
+	let ty = Extlib.init_constant ["MirrorShard"; "Expr"] "signature" in
+	let mk = Extlib.init_constant ["MirrorShard"; "Expr"] "Sig" in
 	let mk_function (denotation, domain, range) = 
 	  let domain = Extlib.List.of_list tvar (List.map (fun x -> mk_tvar (snd x)) domain) in 
 	  let range  = mk_tvar (snd range) in  
@@ -342,9 +344,9 @@ module Bedrock = struct
 	let mk = Extlib.init_constant ["Bedrock"; "SepIL"; "SEP"] "PSig" in
 	let mk_predicate (denotation, domain) = 
 	  let domain = Extlib.List.of_list tvar (List.map (fun x -> mk_tvar (snd x)) domain) in  
-	  Term.mkApp (mk, [| types ; pc_type ; state_type ; domain; denotation |]) 
+	  Term.mkApp (mk, [| types ; (* pc_type ; state_type ; *) domain; denotation |]) 
 	in
-	let ty = Term.mkApp (ty, [| types ; pc_type ; state_type|]) in 
+	let ty = Term.mkApp (ty, [| types (* ; pc_type ; state_type*) |]) in 
 	let preds = Extlib.List.of_list ty (List.map mk_predicate renv.preds) in 
 	debug_type_gl gl preds "PREDS";
 	Extlib.cps_mk_letin "preds" preds (fun preds gl -> 	  
@@ -355,7 +357,7 @@ module Bedrock = struct
 	  debug_type_gl gl sigt "sigt";
 	  let existT = Extlib.init_constant ["Coq" ; "Init"; "Specif"] "existT" in 
 	  debug_type_gl gl existT "existT";
-	  let tvarD = Extlib.init_constant ["Bedrock"; "Expr"] "tvarD" in
+	  let tvarD = Extlib.init_constant ["MirrorShard"; "Expr"] "tvarD" in
 	  let f = 
 	    Term.mkLambda (Names.Anonymous, tvar, Term.mkApp (tvarD, [| types ; Term.mkRel 1|])) in
 	  debug_type_gl gl f "f";
@@ -503,7 +505,7 @@ module Bedrock = struct
     
     
   module Expr = struct
-    let path = ["Bedrock"; "Expr"] 
+    let path = ["MirrorShard"; "Expr"] 
       
     type expr = 
       | Const of tvar * Term.constr
@@ -733,11 +735,11 @@ module Bedrock = struct
     let dump_sexpr gl types se = 
       let path = ["Bedrock"; "SepIL"; "SEP"] in 
       let init x = Extlib.init_constant path x in 
-      let pcT = mk_tvar (Some 0) in 
-      let stT = mk_tvar (Some 1) in 	
+(*      let pcT = mk_tvar (Some 0) in 
+      let stT = mk_tvar (Some 1) in 	*)
       let emp = init "Emp" and inj = init "Inj" and star = init "Star" and exists = init "Exists" and func = init "Func" and const = init "Const" in 
-      let (@@) f l = Term.mkApp (f,Array.of_list (types :: pcT :: stT :: l))  in 
-      let ty = Term.mkApp (Extlib.init_constant ["Bedrock"; "Expr"] "expr", [|types|]) in 
+      let (@@) f l = Term.mkApp (f,Array.of_list (types :: (*pcT :: stT :: *) l))  in 
+      let ty = Term.mkApp (Extlib.init_constant ["MirrorShard"; "Expr"] "expr", [|types|]) in 
       let check x = debug_type_gl gl x ""; x in 
       let rec aux = function 
 	| Const d -> check (const @@ [d])
@@ -778,22 +780,25 @@ module Bedrock = struct
 	  renv, Emp
 	| Term.App (hd, args) when Term.eq_constr hd (Lazy.force inj) -> 
 	  begin 
-	    let p = args.(3) in 
+	    let p = args.(0) in 
+(*
 	    begin match Extlib.decomp_term p with
 	      | Term.App (hd, args) when Term.eq_constr hd (Lazy.force PropX.inj) -> 
-		let renv, p = Expr.reify_expr env evar renv args.(3) in 
-		renv, Inj p
-	      | _ -> 
+*)
+	    let renv, p = Expr.reify_expr env evar renv p in 
+	    renv, Inj p
+(*	      | _ -> 
 		let renv = assert false in (* add the type *)
 		renv, Const p 
 	    end
+*)
 	  end
 	| Term.App (hd, args) when Term.eq_constr hd (Lazy.force star) ->
-	  let renv, l = reify_sexpr env evar renv (args.(3)) in 
-	  let renv, r = reify_sexpr env evar renv (args.(4)) in 
+	  let renv, l = reify_sexpr env evar renv (args.(0)) in 
+	  let renv, r = reify_sexpr env evar renv (args.(1)) in 
 	  renv, Star (l,r)
 	| Term.App (hd, args) when Term.eq_constr hd (Lazy.force ex) ->
-	  let body = args.(4) in 
+	  let body = args.(1) in 
 	  let renv, body = begin match Extlib.decomp_term body with 
 	    | Term.Lambda (name,ty,body) ->
 	      let env = Environ.push_rel (name, None, ty) env in
@@ -804,7 +809,7 @@ module Bedrock = struct
 	  end in
 
 	  (* let renv, body = reify_sexpr env evar renv args.(4) in   *)
-	  let renv, ty = Renv.add_type env evar renv args.(3) in
+	  let renv, ty = Renv.add_type env evar renv args.(0) in
 	  renv, Exists (ty, body)
 	| Term.App (hd, _) -> 
 	  debug ":hd %a\n" pp_constr hd;
@@ -1125,7 +1130,7 @@ module Bedrock = struct
       let evar = Tacmach.project gl in       
       let nil = Lazy.force Extlib.List._nil in 
       let cons = Lazy.force Extlib.List._cons in 
-      let impl = Extlib.init_constant ["Bedrock"; "Expr"] "Impl" in 
+      let impl = Extlib.init_constant ["MirrorShard"; "Expr"] "Impl" in 
       let rec aux renv l =
 	Pattern.matchf l
 	  [
@@ -1151,7 +1156,7 @@ module Bedrock = struct
 
 
     let parse_types (types : Term.constr) = 
-      let impl = Extlib.init_constant ["Bedrock"; "Expr"] "Impl" in 
+      let impl = Extlib.init_constant ["MirrorShard"; "Expr"] "Impl" in 
       let types,_ = Extlib.List.of_constr types in 
        List.map (fun x -> 
 	 let t = Term.mkApp (impl, [|x|]) in 
@@ -1159,7 +1164,7 @@ module Bedrock = struct
 	 
     let parse_funcs env evar renv types (funcs : Term.constr) = 
       try 
-	let denotation = Extlib.init_constant ["Bedrock"; "Expr"] "Denotation" in 
+	let denotation = Extlib.init_constant ["MirrorShard"; "Expr"] "Denotation" in 
 	let funcs,_ = Extlib.List.of_constr funcs in 	
 	let funcs = List.rev funcs in 
 	let funcs = List.map (fun x -> 
@@ -1185,7 +1190,7 @@ module Bedrock = struct
 	let preds , _ = Extlib.List.of_constr preds in 	
 	let preds = List.rev preds in
 	let preds = List.map (fun x -> 
-	  Tacred.simpl env evar (Term.mkApp (denotation, [|types; pcT; stT; x|]))
+	  Tacred.simpl env evar (Term.mkApp (denotation, [|types; (* pcT; stT; *) x|]))
 	) preds in 
 	let renv = List.fold_right (fun f (renv : Renv.t) -> 
 	  let ty = Typing.type_of env evar f in
@@ -1313,7 +1318,8 @@ module Bedrock = struct
 	let _ = let i = ref 0 in List.iter ( fun x ->
 	  debug_type_gl gl x (string_of_int !i); incr i
 	) l in
-	let l = List.map carg l  in 	
+	let l = List.map carg l  in 
+	debug "====> going to call k" ;
 	ltac_apply k l gl)
 
 end

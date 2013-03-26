@@ -17,10 +17,11 @@ Add ML Path "reification".
 Declare ML Module "extlib".
 Declare ML Module "reif". 
 
+Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right associativity).
 
 (** Cancellation **)
 (******************)
-Ltac sep_canceller isConst ext simplifier :=
+Ltac sep_canceller isConst ext :=
 (*TIME  start_timer "sep_canceler:change_to_himp" ; *)
   (try change_to_himp) ;
 (*TIME  stop_timer "sep_canceler:change_to_himp" ; *)
@@ -33,46 +34,51 @@ Ltac sep_canceller isConst ext simplifier :=
     end
   in
   match goal with 
-    | [ |- himp ?cs ?L ?R ] =>
-  let types := reduce_repr ext tt (ILAlgoTypes.PACK.applyTypes (TacPackIL.ILAlgoTypes.Env ext) nil) in
-  let funcs := reduce_repr ext tt (ILAlgoTypes.PACK.applyFuncs (TacPackIL.ILAlgoTypes.Env ext) types (Env.repr (bedrock_funcs_r types) nil)) in
-  let preds := reduce_repr ext tt (ILAlgoTypes.PACK.applyPreds (TacPackIL.ILAlgoTypes.Env ext) types nil) in
-  let all_props := ReifyExpr.collect_props ltac:(ILTacCommon.reflectable shouldReflect) in 
-  let pures := all_props in 
-  
-  let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
-  let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in   
-
-      let k :=
-            (fun types funcs uvars preds L R pures proofs => 
-               (*TIME         stop_timer "sep_canceler:reify" ; *)
-
-               ((** TODO: for some reason the partial application to proofs doesn't always work... **)
-                 apply (@ApplyCancelSep types funcs preds
-                         (ILAlgoTypes.Algos ext types)
-                         (@ILAlgoTypes.Algos_correct ext types funcs preds) uvars pures L R); 
-                [ solve [ apply proofs ] | compute; reflexivity | ]
-               (*TIME       ;  stop_timer "sep_canceler:apply_CancelSep" *)
-               )
-                 || (idtac "failed to apply, generalizing instead!" ;
-                    let algos := constr:(ILAlgoTypes.Algos ext types) in
-                    let algosC := constr:(@ILAlgoTypes.Algos_correct ext types funcs preds) in 
-                    generalize (@ApplyCancelSep types funcs preds algos algosC uvars pures L R));
-                 
-             (*TIME          start_timer "sep_canceler:simplify" ; *)
-           first [ simplifier types funcs preds tt | fail 100000 "canceler: simplifier failed" ] ;
-             (*TIME          stop_timer "sep_canceler:simplify" ; *)
-             (*TIME          start_timer "sep_canceler:clear" ; *)
-           try clear types funcs preds
-             (*TIME        ;  stop_timer "sep_canceler:clear"  *)
-             )
+    | [ |- himp ?L ?R ] =>
+      (let types := reduce_repr ext tt (ILAlgoTypes.PACK.applyTypes (TacPackIL.ILAlgoTypes.Env ext) nil) in
+      let funcs := reduce_repr ext tt (ILAlgoTypes.PACK.applyFuncs (TacPackIL.ILAlgoTypes.Env ext) types (Env.repr (bedrock_funcs_r types) nil)) in
+      let preds := reduce_repr ext tt (ILAlgoTypes.PACK.applyPreds (TacPackIL.ILAlgoTypes.Env ext) types nil) in
+      let all_props := ReifyExpr.collect_props ltac:(ILTacCommon.reflectable shouldReflect) in 
+      let pures := all_props in 
+                
+      let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
+      let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in   
+      let k := fun typesV funcsV uvars predsV L R pures proofs =>
+(*TIME         stop_timer "sep_canceler:reify" ; *)
+        let funcs := eval cbv delta [ funcsV ] in funcsV in
+        let preds := eval cbv delta [ predsV ] in predsV in
+        let puresV := fresh "pures" in
+        pose (puresV := pures) ;
+        let puresPfV := fresh "pures_proof" in
+        assert (puresPfV : Expr.AllProvable funcsV uvars nil puresV) by
+          (cbv beta iota zeta delta 
+            [ Expr.AllProvable Expr.AllProvable_gen Expr.Provable puresV 
+              Expr.exprD nth_error funcsV value error 
+              Expr.Range Expr.Domain Expr.Denotation 
+              Expr.EqDec_tvar Expr.applyD equiv_dec 
+              Expr.tvar_rec Expr.tvar_rect sumbool_rec sumbool_rect
+              Peano_dec.eq_nat_dec nat_rec nat_rect eq_rec_r eq_rect eq_rec 
+              f_equal eq_sym ]; exact proofs ) ; 
+        change (SEP.himp funcsV predsV uvars nil L R) ;
+        apply (@ApplyCancelSep_slice typesV funcsV predsV 
+          (TacPackIL.ILAlgoTypes.Algos ext typesV)
+          (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
+          uvars L R puresV puresPfV); 
+        (let bl := constr:(ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
+         let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+         let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+         subst funcsV predsV  ;
+         evm computed_blacklist [ bl ];
+         clear typesV puresV puresPfV ;
+         match goal with
+           | |- ?G => let H := fresh in assert (H : G); [ intros | apply H ]
+         end)
       in
-        (*TIME         start_timer "sep_canceler:reify"; *)
-
-        (((sep_canceler_plugin types funcs preds pures L R k))
-          (* || fail 10000 "sep_canceler_plugin failed" *))
+(*TIME         start_timer "sep_canceler:reify"; *)
+         ((sep_canceler_plugin types funcs preds pures L R k)
+      || fail 10000 "sep_canceler_plugin failed")) (** this just prevents backtracking **)
     | [ |- ?G ] => 
-        idtac "no match" G 
+      idtac "no match" G
   end.
 
 (** Symbolic Execution **)

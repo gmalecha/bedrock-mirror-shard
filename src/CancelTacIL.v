@@ -1,12 +1,12 @@
-Require Import List.
-Require MirrorShard.CancelLoopTac.
-Require Import MirrorShard.Prover.
-Require Import Word.
-Require Import PropX.
-Require Import IL SepIL.
-Require Import TacPackIL.
+Require MirrorShard.CancelTacBedrock.
+Require MirrorShard.ExprUnify.
+Require Import SepIL TacPackIL.
 
 Set Implicit Arguments.
 Set Strict Implicit.
 
-Module CANCEL_LOOP := MirrorShard.CancelLoopTac.CancelLoopTac SepIL.ST SepIL.SEP SepIL.SH TacPackIL.SEP_LEMMA UNF.
+Module CANCEL_TAC := 
+  MirrorShard.CancelTacBedrock.Make SepIL.ST SepIL.SEP SepIL.SH
+                                    TacPackIL.SEP_LEMMA 
+                                    ExprUnify.UNIFIER
+                                    UNF.
