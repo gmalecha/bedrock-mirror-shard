@@ -1,4 +1,4 @@
-Require Import AutoSep.
+Require Import PreAutoSep.
 
 (** * A trivial example to make sure the separation logic proof automation isn't completely borked *)
 
@@ -19,6 +19,9 @@ Definition read := bmodule "read" {{
     Return "y"
   end
 }}.
+
+Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right associativity).
+
 
 Theorem readOk : moduleOk read.
 (*TIME  Clear Timing Profile. *)

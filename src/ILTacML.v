@@ -60,7 +60,7 @@ Ltac sep_canceller isConst ext :=
               Peano_dec.eq_nat_dec nat_rec nat_rect eq_rec_r eq_rect eq_rec 
               f_equal eq_sym ]; exact proofs ) ; 
         change (SEP.himp funcsV predsV uvars nil L R) ;
-        apply (@ApplyCancelSep_slice typesV funcsV predsV 
+        apply (@CancelTacIL.ApplyCancelSep_slice typesV funcsV predsV 
           (TacPackIL.ILAlgoTypes.Algos ext typesV)
           (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
           uvars L R puresV puresPfV); 
@@ -83,7 +83,7 @@ Ltac sep_canceller isConst ext :=
 
 (** Symbolic Execution **)
 (************************)
-Ltac sym_eval isConst ext simplifier :=
+Ltac sym_eval isConst ext :=
 (*TIME  start_timer "sym_eval:init" ; *)
   let rec init_from st :=
     match goal with
@@ -118,9 +118,9 @@ Ltac sym_eval isConst ext simplifier :=
                   | ?G =>
                       fail 100000 "bad result goal" G 
                 end
-            in let fresh Hcopy := fresh "Hcopy" in
+            in (* let fresh Hcopy := fresh "Hcopy" in
                  let T := type of H in
-                   assert (Hcopy : T) by apply H; clear H; destruct_exs Hcopy))
+                   assert (Hcopy : T) by apply H; clear H; *) destruct_exs H))
     (*TIME                    ;  stop_timer "sym_eval:cleanup" *)
     in
       
@@ -159,26 +159,60 @@ Ltac sym_eval isConst ext simplifier :=
               match find_reg st Rv with
                 | (?rv_v, ?rv_pf) => 
                     let k :=
-                        (fun types funcs uvars preds rp sp rv is isP fin pures proofs => 
+                        (fun typesV funcsV uvars predsV rp sp rv is isP fin pures proofs => 
                            (*TIME       stop_timer "sym_eval:reify" ; *)
                            (*TIME       start_timer "sym_eval:apply" ; *)
+                          (let uvarsV := fresh "uvars" in
+                           pose (uvarsV := uvars) ;
+                           let isV := fresh "path" in
+                           pose (isV := is) ;
+                           let isD := fresh "pathPf" in
+                           assert (isD : @SymIL.istreamD typesV (Env.repr (ILEnv.bedrock_funcs_r typesV) funcsV)
+                             uvarsV nil isV stn st fin) by (exact isP) ;
+                           let puresV := fresh "pures" in
+                           pose (puresV := pures) ;
+                           let puresPf := fresh "puresPf" in
+                           assert (puresPf : @Expr.AllProvable typesV (Env.repr (ILEnv.bedrock_funcs_r typesV) funcsV) uvars nil puresV) by (exact proofs) ;
+                           let new := fresh "after" in
+                           evar (new : Prop) ;
+                           let g := eval cbv delta [ new ] in new in
+                           let result := fresh in
+                           assert (result : g) by 
+                             (generalize (@SymILTac.ApplySymEval_slice_no_heap typesV funcsV predsV
+                                 (@TacPackIL.ILAlgoTypes.Algos ext typesV)
+                                 (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
+                                 stn uvarsV fin st isV isD cs sp_v rv_v rp_v puresV
+                                 sp_pf rv_pf rp_pf puresPf) ;
+                                let bl := constr:(Regs ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
+                                let funcs := eval cbv delta [ funcsV ] in funcsV in
+                                let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+                                let preds := eval cbv delta [ predsV ] in predsV in
+                                let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+                                subst funcsV predsV ; 
+                                evm computed_blacklist [ bl ] ;
+                                refine (fun x => x)) ;
+                             clear new puresPf puresV isD isV uvarsV predsV funcsV typesV ;
+(*TODO                             clear_instrs all_instrs ; *)
+                             finish result) || fail 10000 "symbolic evaluation failed (no heap)"
 
-                        generalize (@SymILTac.stateD_proof_no_heap types funcs preds
-                                             uvars st sp rv rp 
-                                             sp_pf rv_pf rp_pf 
-                                             pures proofs cs stn);
-                          let H_stateD := fresh in
-                          intro H_stateD ;
-                          ((apply (@SymILTac.Apply_sym_eval types funcs preds
-                            (@ILAlgoTypes.Algos ext types) (@ILAlgoTypes.Algos_correct ext types funcs preds)
-                            stn uvars fin st is isP) in H_stateD)
-                             || fail 100000 "couldn't apply sym_eval_any! (non-SF case)"); 
-                           (*TIME       stop_timer "sym_eval:apply" ; *)
-                           (*TIME       start_timer "sym_eval:simplify" ; *)
-                          first [ simplifier types funcs preds H_stateD | fail 100000 "simplifier failed! (non-SF)" ] ;
-                          try clear types funcs preds ;
-                            (*TIME       stop_timer "sym_eval:simplify" ; *)
-                          first [ finish H_stateD (*; clear_instrs all_instrs*) | fail 100000 "finisher failed! (non-SF)" ]
+
+
+                        (* generalize (@SymILTac.stateD_proof_no_heap types funcs preds *)
+                        (*                      uvars st sp rv rp  *)
+                        (*                      sp_pf rv_pf rp_pf  *)
+                        (*                      pures proofs cs stn); *)
+                        (*   let H_stateD := fresh in *)
+                        (*   intro H_stateD ; *)
+                        (*   ((apply (@SymILTac.Apply_sym_eval types funcs preds *)
+                        (*     (@ILAlgoTypes.Algos ext types) (@ILAlgoTypes.Algos_correct ext types funcs preds) *)
+                        (*     stn uvars fin st is isP) in H_stateD) *)
+                        (*      || fail 100000 "couldn't apply sym_eval_any! (non-SF case)");  *)
+                        (*    (*TIME       stop_timer "sym_eval:apply" ; *) *)
+                        (*    (*TIME       start_timer "sym_eval:simplify" ; *) *)
+                        (*   first [ simplifier types funcs preds H_stateD | fail 100000 "simplifier failed! (non-SF)" ] ; *)
+                        (*   try clear types funcs preds ; *)
+                        (*     (*TIME       stop_timer "sym_eval:simplify" ; *) *)
+                        (*   first [ finish H_stateD (*; clear_instrs all_instrs*) | fail 100000 "finisher failed! (non-SF)" ] *)
                         )                         
                     in
                       (*TIME       start_timer "sym_eval:reify"; *)
@@ -194,24 +228,58 @@ Ltac sym_eval isConst ext simplifier :=
                 | (?sp_v, ?sp_pf) =>
                     match find_reg st Rv with
                       | (?rv_v, ?rv_pf) =>                         
-                        let k := (fun types funcs uvars preds rp sp rv is isP fin pures proofs SF => 
-                           (*TIME       stop_timer "sym_eval:reify" ; *)
-                           (*TIME       start_timer "sym_eval:apply" ; *)
+                        let k := (fun typesV funcsV uvars predsV rp sp rv is isP fin pures proofs SF =>
+
+                          (  let uvarsV := fresh "uvars" in
+                             pose (uvarsV := uvars) ;
+                             let isV := fresh "path" in
+                             pose (isV := is) ;
+                             let isD := fresh "pathPf" in
+                             assert (isD : @SymIL.istreamD typesV (Env.repr (ILEnv.bedrock_funcs_r typesV) funcsV)
+                              uvarsV nil isV stn st fin) by (exact isP) ;
+                             let puresV := fresh "pures" in
+                             pose (puresV := pures) ;
+                             let puresPf := fresh "puresPf" in
+                             assert (puresPf : @Expr.AllProvable typesV (Env.repr (ILEnv.bedrock_funcs_r typesV) funcsV) uvars nil puresV) by (exact proofs) ;
+                             let new := fresh "after" in
+                             evar (new : Prop) ;
+                             let g := eval cbv delta [ new ] in new in
+                             let result := fresh in
+                             assert (result : g) by  
+                               (generalize (@SymILTac.ApplySymEval_slice_heap typesV funcsV predsV
+                                 (@TacPackIL.ILAlgoTypes.Algos ext typesV)
+                                 (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
+                                 stn uvarsV fin st isV isD cs sp_v rv_v rp_v puresV SF
+                                 sp_pf rv_pf rp_pf puresPf H_interp) ;
+                                let bl := constr:(Regs ::: PropX.interp ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
+                                let funcs := eval cbv delta [ funcsV ] in funcsV in
+                                let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+                                let preds := eval cbv delta [ predsV ] in predsV in
+                                let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+                                subst funcsV predsV ; 
+                                evm computed_blacklist [ bl ] ;
+                                refine (fun x => x)) ; 
+                             clear new H_interp puresPf puresV isD isV uvarsV predsV funcsV typesV ;
+(*TODO                             clear_instrs all_instrs ; *)
+                             finish result) || fail 10000 "symbolic evaluation failed (with heap)" )
+
+                           (* (*TIME       stop_timer "sym_eval:reify" ; *) *)
+                           (* (*TIME       start_timer "sym_eval:apply" ; *) *)
                                     
                                     
-                                apply (@SymILTac.stateD_proof types funcs preds
-                                        uvars _ sp rv rp 
-                                        sp_pf rv_pf rp_pf pures proofs SF _ _ (refl_equal _)) in H_interp ;
-                                  ((apply (@SymILTac.Apply_sym_eval types funcs preds
-                                            (@ILAlgoTypes.Algos ext types) (@ILAlgoTypes.Algos_correct ext types funcs preds)
-                                        stn uvars fin st is isP) in H_interp) 
-                                  ) ;
-                           (*TIME       stop_timer "sym_eval:apply" ; *)
-                           (*TIME       start_timer "sym_eval:simplify" ; *)
-                            first [ simplifier types funcs preds H_interp | fail 100000 "simplifier failed! (SF)" ] ;
-                            try clear types funcs preds ;
-                            (*TIME       stop_timer "sym_eval:simplify" ; *)
-                            first [ finish H_interp (* ; clear_instrs all_instrs *) | fail 100000 "finisher failed! (SF)" ])
+                           (*      apply (@SymILTac.stateD_proof types funcs preds *)
+                           (*              uvars _ sp rv rp  *)
+                           (*              sp_pf rv_pf rp_pf pures proofs SF _ _ (refl_equal _)) in H_interp ; *)
+                           (*        ((apply (@SymILTac.Apply_sym_eval types funcs preds *)
+                           (*                  (@ILAlgoTypes.Algos ext types) (@ILAlgoTypes.Algos_correct ext types funcs preds) *)
+                           (*              stn uvars fin st is isP) in H_interp)  *)
+                           (*        ) ; *)
+                           (* (*TIME       stop_timer "sym_eval:apply" ; *) *)
+                           (* (*TIME       start_timer "sym_eval:simplify" ; *) *)
+                           (*  first [ simplifier types funcs preds H_interp | fail 100000 "simplifier failed! (SF)" ] ; *)
+                           (*  try clear types funcs preds ; *)
+                           (*  (*TIME       stop_timer "sym_eval:simplify" ; *) *)
+                           (*  first [ finish H_interp (* ; clear_instrs all_instrs *) | fail 100000 "finisher failed! (SF)" ]) *)
                         in                         (*TIME       start_timer "sym_eval:reify" ; *)
                           (sym_eval_sep  types funcs preds pures rp_v sp_v rv_v st SF k) || fail 10000  "bad enough"
                     end                      

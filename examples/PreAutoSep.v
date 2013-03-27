@@ -911,7 +911,7 @@ Ltac evaluate ext :=
   repeat match goal with
            | [ H : ?P -> False |- _ ] => change (not P) in H
          end;
-  ILTac.sym_eval ltac:(ILTacCommon.isConst) ext ltac:(hints_ext_simplifier ext);
+  ILTac.sym_eval ltac:(ILTacCommon.isConst) ext (* ltac:(hints_ext_simplifier ext) *);
   clear_junk.
 
 Ltac cancel ext := 
