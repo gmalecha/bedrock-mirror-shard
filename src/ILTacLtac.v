@@ -107,7 +107,7 @@ Ltac sep_canceller isConst ext :=
                         (TacPackIL.ILAlgoTypes.Algos ext typesV)
                         (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                         uvars L R puresV puresPfV); 
-                      (let bl := constr:(ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
+                      (let bl := constr:(not ::: ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
                        let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
                        let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
                        subst funcsV predsV  ;
@@ -230,35 +230,36 @@ Ltac sym_eval isConst ext :=
                   ReifyExpr.reify_expr ltac:(isConst) rv_v typesV funcs uvars vars ltac:(fun uvars funcs rv_v => 
                     let finish H  :=
 (*TIME                      start_timer "sym_eval:cleanup" ; *)
-                      ((try exact H) ||
-                       (let rec destruct_exs H :=
-                         match type of H with
-                           | Logic.ex _ =>
-                             destruct H as [ ? H ] ; destruct_exs H
-                           | forall x : ?T, _ =>
-                             let n := fresh in
-                             evar (n : T); 
-                             let e := eval cbv delta [ n ] in n in 
-                             specialize (H e)                             
-                           | (_ /\ (_ /\ _)) /\ (_ /\ _) =>
-                             destruct H as [ [ ? [ ? ? ] ] [ ? ? ] ];
-                               repeat match goal with
-                                        | [ H' : _ /\ _ |- _ ] => destruct H'
-                                      end
-                           | False => destruct H
-                           | ?G =>
-                             fail 100000 "bad result goal" G
-                         end
-                        in (* let fresh Hcopy := fresh "Hcopy" in
+                      first [ exact H 
+                            | let rec destruct_exs H :=
+                                match type of H with
+                                  | Logic.ex _ =>
+                                    destruct H as [ ? H ] ; destruct_exs H
+                                  | forall x : ?T, _ =>
+                                    let n := fresh in
+                                      evar (n : T); 
+                                      let e := eval cbv delta [ n ] in n in 
+                                        specialize (H e)                             
+                                  | (_ /\ (_ /\ _)) /\ (_ /\ _) =>
+                                    destruct H as [ [ ? [ ? ? ] ] [ ? ? ] ];
+                                      repeat match goal with
+                                               | [ H' : _ /\ _ |- _ ] => destruct H'
+                                             end
+                                  | False => destruct H
+                                  | ?G =>
+                                    fail 100000 "bad result goal" G
+                                end
+                              in (* let fresh Hcopy := fresh "Hcopy" in
                           let T := type of H in
-                            assert (Hcopy : T) by apply H; clear H; *) destruct_exs H))
+                            assert (Hcopy : T) by apply H; clear H; *) destruct_exs H ]
 (*TIME                    ;  stop_timer "sym_eval:cleanup" *)
                     in
                     build_path typesV all_instrs st uvars vars funcs ltac:(fun uvars funcs is fin_state is_pf => 
                       match SF with
                         | tt => 
 (*TIME                          stop_timer "sym_eval:reify" ; *)
-                          (let funcsV := fresh "funcs" in
+                          first [
+                            let funcsV := fresh "funcs" in
                            pose (funcsV := funcs) ;
                            let predsV := fresh "preds" in
                            pose (predsV := preds) ;
@@ -283,7 +284,7 @@ Ltac sym_eval isConst ext :=
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                                  stn uvarsV fin_state st isV isD cs sp_v rv_v rp_v puresV
                                  sp_pf rv_pf rp_pf puresPf) ;
-                                let bl := constr:(Regs ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
+                                let bl := constr:(not ::: Regs ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
                                 let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
                                 let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
                                 subst funcsV predsV ; 
@@ -291,14 +292,15 @@ Ltac sym_eval isConst ext :=
                                 refine (fun x => x)) ;
                              clear new puresPf puresV isD isV uvarsV predsV funcsV typesV ;
                              clear_instrs all_instrs ;
-                             finish result) || fail 10000 "symbolic evaluation failed (no heap)"
+                             finish result | fail 10000 "symbolic evaluation failed (no heap)" ]
 
                         | (?SF, ?H_interp) =>
                           SEP_REIFY.reify_sexpr ltac:(isConst) SF typesV funcs pcT stT preds uvars vars 
                           ltac:(fun uvars funcs preds SF =>
 (*TIME                            stop_timer "sym_eval:reify" ; *)
 (*TIME                            start_timer "sym_eval:pose" ; *)
-                            (let funcsV := fresh "funcs" in
+                            first [ 
+                              let funcsV := fresh "funcs" in
                              pose (funcsV := funcs) ;
                              let predsV := fresh "preds" in
                              pose (predsV := preds) ;
@@ -323,7 +325,7 @@ Ltac sym_eval isConst ext :=
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                                  stn uvarsV fin_state st isV isD cs sp_v rv_v rp_v puresV SF
                                  sp_pf rv_pf rp_pf puresPf H_interp) ;
-                                let bl := constr:(Regs ::: PropX.interp ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
+                                let bl := constr:(not ::: Regs ::: PropX.interp ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
                                 let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
                                 let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
                                 subst funcsV predsV ; 
@@ -331,7 +333,7 @@ Ltac sym_eval isConst ext :=
                                 refine (fun x => x)) ; 
                              clear new H_interp puresPf puresV isD isV uvarsV predsV funcsV typesV ;
                              clear_instrs all_instrs ;
-                             finish result) || fail 10000 "symbolic evaluation failed (with heap)" )
+                             finish result | fail 10000 "symbolic evaluation failed (with heap)" ])
                       end)))))  ))))
               end
           end

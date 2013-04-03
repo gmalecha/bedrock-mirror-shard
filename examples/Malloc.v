@@ -3,7 +3,7 @@ Require Import Arith List.
 
 Set Implicit Arguments.
 
-Local Hint Extern 1 (himp _ (allocated _ _ _) (allocated _ _ _)) => apply allocated_shift_base.
+Local Hint Extern 1 (himp (allocated _ _ _) (allocated _ _ _)) => apply allocated_shift_base.
 
 Lemma wplus_lt_lift : forall n m o : nat,
   goodSize (n + m)
@@ -376,7 +376,7 @@ Section mallocOk.
 
   Theorem mallocMOk : moduleOk mallocM.
 (*TIME idtac "malloc:verify". Time *)
-    vcgen; abstract combined.
+   Time vcgen; abstract combined.
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

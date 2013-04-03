@@ -264,12 +264,12 @@ Inductive qspec :=
 Notation "'Ex' x , b" := (Quant (fun x => b)) : qspec_scope.
 Notation "'Ex' x : A , b" := (Quant (fun x : A => b)) : qspec_scope.
 
-Notation "'Emp'" := (Body (empB _)) : qspec_scope.
-Notation "[| P |]" := (Body (injB _ P)) : qspec_scope.
-Notation "[|| P ||]" := (Body (injBX P%PropX)) : qspec_scope.
-Notation "a =8> v" := (Body (ptsto8 _ a v)) : qspec_scope.
-Notation "a =*> v" := (Body (ptsto32 _ a v)) : qspec_scope.
-Notation "P * Q" := (Body (starB P%Sep Q%Sep)) : qspec_scope.
+Notation "'Emp'" := (Body (@empB _)) : qspec_scope.
+Notation "[| P |]" := (Body (@injB _ P)) : qspec_scope.
+Notation "[|| P ||]" := (Body (@injBX _ P%PropX)) : qspec_scope.
+Notation "a =8> v" := (Body (@ptsto8 _ a v)) : qspec_scope.
+Notation "a =*> v" := (Body (@ptsto32 _ a v)) : qspec_scope.
+Notation "P * Q" := (Body (@starB _ P%Sep Q%Sep)) : qspec_scope.
 Coercion Body : HProp >-> qspec.
 
 Delimit Scope qspec_scope with qspec.

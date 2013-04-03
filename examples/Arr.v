@@ -93,7 +93,7 @@ Local Hint Extern 1 (_ < _) => congruence.
 Theorem arrayOk : moduleOk array.
   vcgen; abstract (sep_auto;
     match goal with
-      | [ |- himp _ (Array.array ?A _) (Array.array ?B _) ] =>
+      | [ |- himp (Array.array ?A _) (Array.array ?B _) ] =>
         replace B with A by (eapply agreeUpTo_done; eauto 10); reflexivity
       | _ => eauto 10
     end).

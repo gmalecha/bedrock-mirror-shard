@@ -996,9 +996,14 @@ Theorem extractPure : forall specs P Q Q' R st,
   apply Env; simpl; eauto.
 Qed.
 
-Ltac words := repeat match goal with
-                       | [ H : _ = _ |- _ ] => rewrite H
-                     end; W_eq.
+Ltac words := 
+  repeat match goal with
+           | [ H : _ = _ |- _ ] => rewrite H
+         end; 
+         match goal with
+           | |- ?G => has_evar G ; fail 2
+           | _ => W_eq
+         end.
 
 Definition locals_return ns vs avail p (ns' : list string) (avail' offset : nat) :=
   locals ns vs avail p.
@@ -1181,7 +1186,7 @@ Ltac step ext :=
     | [ |- _ _ = Some _ ] => solve [ eauto ]
     | [ _ : interp _ (![ ?pre ] _) |- interp _ (![ ?post ] _) ] => considerImp pre post
     | [ |- interp _ (![?pre]%PropX _ ---> ![?post]%PropX _) ] => considerImp pre post
-    | [ |- himp _ ?pre ?post ] => considerImp pre post
+    | [ |- himp ?pre ?post ] => considerImp pre post
     | [ |- interp _ (_ _ _ ?x ---> _ _ _ ?y ---> _ ?x)%PropX ] =>
       match y with
         | x => fail 1

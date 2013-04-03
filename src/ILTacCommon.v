@@ -106,9 +106,10 @@ Ltac reflectable shouldReflect P :=
   match P with
     | @PropX.interp _ _ _ _ => false
     | @PropX.valid _ _ _ _ _ => false
-    | forall x, _ => false
     | context [ PropX.PropX _ _ ] => false
     | context [ PropX.spec _ _ ] => false
+    | ?X -> False => shouldReflect X
+    | forall x, _ => false
     | _ => match type of P with
              | Prop => shouldReflect P
            end
@@ -116,6 +117,7 @@ Ltac reflectable shouldReflect P :=
 
 Ltac shouldReflect P :=
   match P with
+    | ?X -> False => shouldReflect X
     | evalInstrs _ _ _ = _ => false
     | Structured.evalCond _ _ _ _ _ = _ => false
     | @PropX.interp _ _ _ _ => false

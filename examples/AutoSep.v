@@ -2,8 +2,11 @@ Require Import PreAutoSep.
 
 Export PreAutoSep.
 
-Require Import Bool StreamParse ArrayQuery.
+Require Import Bool.
+(*
+ StreamParse ArrayQuery.
 Export StreamParse ArrayQuery.
+*)
 
 Ltac vcgen_simp := cbv beta iota zeta delta [map app imps
   LabelMap.add Entry Blocks Postcondition VerifCond
@@ -39,12 +42,12 @@ Ltac vcgen_simp := cbv beta iota zeta delta [map app imps
   Cond_ Cond
   Lambda__ Lambda_
 
-  Wrap.Wrap
-  Parse1 ParseOne ParseOne'
-  Query ForArray
+(*  Wrap.Wrap *)
+(*  Parse1 ParseOne ParseOne' *)
+(*  Query ForArray *)
 ].
 
 Ltac vcgen :=
   structured_auto vcgen_simp;
   autorewrite with sepFormula in *; simpl in *;
-    unfold starB, hvarB, hpropB in *; fold hprop in *; refold.
+    (* unfold starB, hvarB, hpropB in *; fold hprop in *; *) refold.

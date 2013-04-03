@@ -518,7 +518,7 @@ Module Extension.
     induction 1; simpl; intros; auto. constructor; eauto. eapply IHForall. auto.
   Qed.
 
-  Definition extend_opt_hints types (o : option (UNF.hintsPayload types)) (fwd bwd : list (SepLemma.lemma types (SEP_LEMMA.sepConcl types))) : option (UNF.hintsPayload types) :=
+  Definition extend_opt_hints types (o : option (UNF.hintsPayload types)) (fwd bwd : list (Lemma.lemma types (SEP_LEMMA.sepConcl types))) : option (UNF.hintsPayload types) :=
     match fwd , bwd with
       | nil , nil => o
       | _ , _ =>
@@ -527,7 +527,7 @@ Module Extension.
           | Some e => Some (UNF.Build_hintsPayload (UNF.Forward e ++ fwd) (UNF.Backward e ++ bwd))
         end
     end.
-  Lemma extend_opt_hintsOk : forall types funcs preds (o : option (UNF.hintsPayload types)) (fwd bwd : list (SepLemma.lemma types (SEP_LEMMA.sepConcl types))),
+  Lemma extend_opt_hintsOk : forall types funcs preds (o : option (UNF.hintsPayload types)) (fwd bwd : list (Lemma.lemma types (SEP_LEMMA.sepConcl types))),
     match o with
       | None => True
       | Some H => @UNF.hintsSoundness types funcs preds H
@@ -564,51 +564,38 @@ Module Extension.
     gather_env_meval mevals ts fs ps ltac:(fun ts fs ps =>
     (*TIME stop_timer "extend:gather" ; *)
     (*TIME start_timer "extend:reduce_repr" ; *)
-      idtac "0" ;
       let types := reduce_repr (Env.repr ts nil) in
     (*TIME stop_timer "extend:reduce_repr" ; *)
     (*TIME start_timer "extend:reify" ; *)
       HINTS_REIFY.collectTypes_hints unfoldTac isConst fwd (Reify.Tnil) ltac:(fun Ts =>
       HINTS_REIFY.collectTypes_hints unfoldTac isConst bwd Ts ltac:(fun Ts => (
-        idtac "1" ;
       let types := ReifyExpr.extend_all_types Ts types in
-        idtac "1.0" ;
       set (typesV := types) ;
       let funcs := reduce_repr (Env.repr (fs types) nil) in
       let preds := reduce_repr (Env.repr (ps types) nil) in
       let pcT := ILEnv.BedrockCoreEnv.pc in
       let stateT := ILEnv.BedrockCoreEnv.st in
-        idtac "1.1" ;
       HINTS_REIFY.reify_hints unfoldTac pcT stateT isConst fwd types funcs preds ltac:(fun funcs preds fwd' =>
-        idtac "1.2" ;
       HINTS_REIFY.reify_hints unfoldTac pcT stateT isConst bwd types funcs preds ltac:(fun funcs preds bwd' => (
-        idtac "3" ;
     (*TIME stop_timer "extend:reify" ; *)
     (*TIME start_timer "extend:lifting" ; *)
         let types_r := eval cbv beta iota zeta delta [ typesV Env.listToRepr map ] in (Env.listToRepr typesV Expr.EmptySet_type) in
         set (types_rV := types_r) ;
-          idtac "3.1" ;
         let funcs_r := HINTS_REIFY.lift_signatures_over_repr funcs types_rV in
         let funcs_r := eval cbv beta iota zeta delta [ Env.listToRepr map ] in
           (fun ts => Env.listToRepr (funcs_r ts) (Expr.Default_signature (Env.repr types_rV ts))) in
-          idtac "3.2" ;
         set (funcs_rV := funcs_r) ;
         let preds_r := HINTS_REIFY.lift_ssignatures_over_repr preds types_rV in
-          idtac "3.3" ;
         let preds_r := eval cbv beta iota zeta delta [ Env.listToRepr map ] in
           (fun ts => Env.listToRepr (preds_r ts) (SEP.Default_predicate (Env.repr types_rV ts))) in
-          idtac "4" ;
         set (preds_rV := preds_r) ;
     (*TIME stop_timer "extend:lifting" ; *)
     (*TIME start_timer "extend:combining" ; *)
         set (env := {| ILAlgoTypes.PACK.Types := types_rV 
                      ; ILAlgoTypes.PACK.Funcs := funcs_rV
                      ; ILAlgoTypes.PACK.Preds := preds_rV |}) ;
-        idtac "5" ;
         let fwd' := HINTS_REIFY.lift_lemmas_over_repr fwd' types_rV in
-          idtac "5.1" ;
         let bwd' := HINTS_REIFY.lift_lemmas_over_repr bwd' types_rV in
-          idtac "6" ;
         let nprover :=
           match prover with
             | tt => match pack with
@@ -621,7 +608,6 @@ Module Extension.
                    end
           end
         in
-        idtac "7" ;
         let nmevals :=
           match mevals with
             | tt => match pack with
@@ -634,7 +620,6 @@ Module Extension.
                    end
           end
         in
-        idtac "8" ;
         let nhints := 
           let res := match pack with
             | tt => constr:(fun ts => @extend_opt_hints _ None (fwd' ts) (bwd' ts))
@@ -644,29 +629,24 @@ constr:(fun ts => @None (UNF.hintsPayload (Env.repr ILEnv.BedrockCoreEnv.core (E
           end in
           eval simpl extend_opt_hints in res
         in
-        idtac "9" ;
         let algos := eval cbv beta in
           (fun ts => @ILAlgoTypes.Build_AllAlgos (ILAlgoTypes.PACK.applyTypes env ts) (nprover ts) (nhints ts) (nmevals ts)) in
-        idtac "10" ;
         set (algos_V := algos) ;
         refine ({| ILAlgoTypes.Env := env
                  ; ILAlgoTypes.Algos := algos_V
                  ; ILAlgoTypes.Algos_correct := _
                 |});
-        idtac "11" ;
     (*TIME stop_timer "extend:combining" ; *)
         abstract (let ts := fresh "ts" in
          let fs := fresh "fs" in
          let ps := fresh "ps" in
          intros ts fs ps ; 
-           idtac "12" ;
          let ntypes := fresh "types" in
          set (ntypes := @ILAlgoTypes.PACK.applyTypes env ts) ;
          let nfuncs := fresh "funcs" in
          set (nfuncs := @ILAlgoTypes.PACK.applyFuncs env ntypes fs) ;
          let npreds := fresh "preds" in
          set (npreds := @ILAlgoTypes.PACK.applyPreds env ntypes ps) ;
-           idtac "13" ;
          constructor ;
          [ match prover with
              | tt => match pack with
@@ -678,8 +658,7 @@ constr:(fun ts => @None (UNF.hintsPayload (Env.repr ILEnv.BedrockCoreEnv.core (E
                       | _ => idtac "NOPE" prover pack
                     end
            end
-         | idtac "14" ;
-           match goal with
+         | match goal with
              | [ |- match ?X with _ => _ end ] =>
                match pack with 
                  | tt => change (X) with (@extend_opt_hints _ None (fwd' ntypes) (bwd' ntypes))
@@ -687,8 +666,7 @@ constr:(fun ts => @None (UNF.hintsPayload (Env.repr ILEnv.BedrockCoreEnv.core (E
                    (change (X) with (@extend_opt_hints _ (ILAlgoTypes.Hints (ILAlgoTypes.Algos pack (Env.repr types_rV ts))) (fwd' ntypes) (bwd' ntypes)))
                end; apply extend_opt_hintsOk; [ simpl; auto | HINTS_REIFY.prove fwd | HINTS_REIFY.prove bwd ]
            end
-         | idtac "15" ;
-           match mevals with
+         | match mevals with
              | tt => match pack with
                        | tt => simpl; trivial
                        | _ => eapply (@ILAlgoTypes.Algos_correct pack ntypes nfuncs npreds)

@@ -1,10 +1,10 @@
-Require Import AutoSep Malloc Sets.
+Require Import PreAutoSep Malloc Sets.
 
 Set Implicit Arguments.
 
 
-Local Hint Extern 3 (himp _ _ _) => apply himp_star_frame.
-Local Hint Extern 3 (himp _ _ _) => apply himp_star_frame_comm.
+Local Hint Extern 3 (himp _ _) => apply himp_star_frame.
+Local Hint Extern 3 (himp _ _) => apply himp_star_frame_comm.
 
 Inductive tree :=
 | Leaf
@@ -310,11 +310,11 @@ Qed.
 
 Local Hint Resolve exhausted_cases.
 Local Hint Extern 5 (@eq W _ _) => words.
-Local Hint Extern 3 (himp _ _ _) => apply bst'_set_extensional.
+Local Hint Extern 3 (himp _ _) => apply bst'_set_extensional.
 
 Theorem bstMOk : moduleOk bstM.
 (*TIME idtac "tree-set:verify". Time *)
-  vcgen; abstract (sep hints; auto).
+  Time vcgen; abstract (sep hints; auto).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

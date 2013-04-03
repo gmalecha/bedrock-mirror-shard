@@ -3,8 +3,8 @@ Require Import AutoSep Malloc Sets.
 Set Implicit Arguments.
 
 
-Local Hint Extern 3 (himp _ _ _) => apply himp_star_frame.
-Local Hint Extern 3 (himp _ _ _) => apply himp_star_frame_comm.
+Local Hint Extern 3 (himp _ _) => apply himp_star_frame.
+Local Hint Extern 3 (himp _ _) => apply himp_star_frame_comm.
 
 Module Type USL. (* For "unsorted list" *)
   Parameter usl' : set -> nat -> W -> HProp.
@@ -182,7 +182,7 @@ Definition uslM := bimport [[ "malloc"!"malloc" @ [mallocS], "malloc"!"free" @ [
 }}.
 
 Local Hint Extern 5 (@eq W _ _) => words.
-Local Hint Extern 3 (himp _ _ _) => apply usl'_set_extensional.
+Local Hint Extern 3 (himp _ _) => apply usl'_set_extensional.
 
 Lemma contradictory_membership : forall (s : set) v x,
   x = natToW 1
@@ -195,7 +195,7 @@ Hint Extern 1 => eapply contradictory_membership; eassumption.
 
 Theorem uslMOk : moduleOk uslM.
 (*TIME idtac "tree-set:verify". Time *)
-  vcgen; abstract (sep hints; auto).
+  Time vcgen; abstract (sep hints; auto).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

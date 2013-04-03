@@ -420,7 +420,11 @@ Section correctness.
   Qed.
 End correctness.
 
+Require Import MirrorShard.SepExprTac.
+Module SEP_TAC := SepExprTac.Make SepIL.ST SepIL.SEP.
+
 Section abstracted.
+
   Variable types' : list type.
   Notation TYPES := (repr bedrock_types_r types').
 
@@ -438,47 +442,17 @@ Section abstracted.
   Variable algos : ILAlgoTypes.AllAlgos TYPES.
 
   Variable interp : codeSpec W (IL.settings * IL.state) -> PropX.PropX W (IL.settings * IL.state) -> Prop.
-  Variables (emp : hprop) (star : hprop -> hprop -> hprop) (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop).
+  Variables (emp : hprop) (star : hprop -> hprop -> hprop) (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop) (not : Prop -> Prop).
   Variable Regs : state -> regs.
 
-  Definition nsexprD  (types : list Expr.type) (funcs : Expr.functions types)
-    (sfuncs : SEP.predicates types)  :=
-    fix sexprD (meta_env var_env : Expr.env types) (s : SEP.sexpr types) {struct s} : hprop :=
-    match s with
-      | SEP.Emp => emp
-      | SEP.Inj p =>
-        match Expr.exprD funcs meta_env var_env p Expr.tvProp with
-          | Some p0 => inj p0
-          | None => inj (SepExpr.BadInj p)
-        end
-      | SEP.Star l r =>
-        star (sexprD meta_env var_env l) (sexprD meta_env var_env r)
-      | SEP.Exists t b =>
-        ex (fun x : Expr.tvarD types t =>
-          sexprD meta_env (@existT _ (Expr.tvarD types) t x :: var_env) b)
-      | SEP.Func f b =>
-        match nth_error sfuncs f with
-          | Some f' =>
-            match
-              Expr.applyD (Expr.exprD funcs meta_env var_env) 
-              (SEP.SDomain f') b hprop (SEP.SDenotation f')
-              with
-              | Some p => p
-              | None => inj (SepExpr.BadPredApply f b var_env)
-            end
-          | None => inj (SepExpr.BadPred f)
-        end
-      | SEP.Const p => p
-    end.
-
-  Definition stateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (ss : SymState TYPES) : Prop :=
+  Definition nstateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (ss : SymState TYPES) : Prop :=
     let (stn,st) := stn_st in
       match ss with
         | {| SymMem := m ; SymRegs := (sp, rp, rv) ; SymPures := pures |} =>
           match 
-            exprD funcs uvars vars sp tvWord ,
-            exprD funcs uvars vars rp tvWord ,
-            exprD funcs uvars vars rv tvWord
+            ExprTac.nexprD not _ funcs uvars vars sp tvWord ,
+            ExprTac.nexprD not _ funcs uvars vars rp tvWord ,
+            ExprTac.nexprD not _ funcs uvars vars rv tvWord
             with
             | Some sp , Some rp , Some rv =>
               Regs st Sp = sp /\ Regs st Rp = rp /\ Regs st Rv = rv
@@ -487,17 +461,17 @@ Section abstracted.
           /\ match m with 
                | None => True
                | Some m => 
-                 interp cs (SepIL.SepFormula.sepFormula (nsexprD funcs preds uvars vars (SH.sheapD m)) stn_st)%PropX
+                 interp cs (SepIL.SepFormula.sepFormula (SEP_TAC.nsexprD not emp star ex inj _ funcs preds uvars vars (SH.sheapD m)) stn_st)%PropX
              end
-          /\ AllProvable funcs uvars vars (match m with 
-                                             | None => pures
-                                             | Some m => pures ++ SH.pures m
-                                           end)
+          /\ ExprTac.nAllProvable_and not _ funcs uvars vars True (match m with 
+                                                                     | None => pures
+                                                                     | Some m => pures ++ SH.pures m
+                                                                   end)
       end.
 
   Definition qstateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (qs : Quantifier.Quant) 
     (ss : SymState TYPES) : Prop :=
-    Quantifier.quantD vars uvars qs (fun vars_env meta_env => stateD meta_env vars_env cs stn_st ss).
+    Quantifier.quantD vars uvars qs (fun vars_env meta_env => nstateD meta_env vars_env cs stn_st ss).
 
   Definition sym_eval_prop sound_or_safe cs meta_env stn path qs_env ss :=
     match sym_eval algos (typeof_env meta_env) path qs_env ss  with
@@ -505,16 +479,28 @@ Section abstracted.
         quantD nil meta_env qs' (fun vars_env meta_env =>
           match sound_or_safe with
             | None => False
-            | Some st' => stateD meta_env vars_env cs (stn, st') ss'
+            | Some st' => nstateD meta_env vars_env cs (stn, st') ss'
           end)
       | SafeUntil qs' ss' is' =>
         quantD nil meta_env qs' (fun vars_env meta_env =>
           exists st' : state,
-            stateD meta_env vars_env cs (stn, st') ss' /\
+            nstateD meta_env vars_env cs (stn, st') ss' /\
             istreamD funcs meta_env vars_env is' stn st' sound_or_safe)
     end.
 
 End abstracted.
+
+Theorem nstateD_stateD : forall ts fs ps us vs cs s ss,
+  nstateD fs ps (@interp _ _) ST.emp star ex inj not Regs us vs cs s ss
+  <->
+  @stateD ts fs ps us vs cs s ss.
+Proof.
+  unfold nstateD, stateD. destruct s; auto.
+  destruct ss. destruct SymRegs as [ [ ] ].
+  rewrite ExprTac.nexprD_exprD.
+  rewrite SEP_TAC.nsexprD_sexprD.
+  rewrite ExprTac.nAllProvable_and_AllProvable_and. reflexivity.
+Qed.
 
 Local Notation tvWord := (tvType 0).
 
@@ -525,7 +511,7 @@ Definition sym_eval_prop_no_heap (types' : list type) (funcs' : functions (repr 
   (interp : codeSpec W (settings * state) ->
             PropX W (settings * state) -> Prop) (emp : hprop)
   (star : hprop -> hprop -> hprop)
-  (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop)
+  (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop) (not : Prop -> Prop)
   (sound_or_safe : option state) (cs : codeSpec W (settings * state))
   (meta_env : env (repr bedrock_types_r types')) (stn : settings)
   (path : istream (repr bedrock_types_r (repr bedrock_types_r types')))
@@ -536,7 +522,7 @@ Definition sym_eval_prop_no_heap (types' : list type) (funcs' : functions (repr 
       (fun vars_env meta_env0 : env (repr bedrock_types_r types') =>
         match sound_or_safe with
           | Some st' =>
-            stateD funcs' preds interp emp star ex inj Regs meta_env0 vars_env cs
+            nstateD funcs' preds interp emp star ex inj not Regs meta_env0 vars_env cs
             (stn, st') ss'
           | None => False
         end)
@@ -544,11 +530,13 @@ Definition sym_eval_prop_no_heap (types' : list type) (funcs' : functions (repr 
       quantD nil meta_env qs'
       (fun vars_env meta_env0 : env (repr bedrock_types_r types') =>
         exists st' : state,
-          stateD funcs' preds interp emp star ex inj Regs meta_env0 vars_env cs
+          nstateD funcs' preds interp emp star ex inj not Regs meta_env0 vars_env cs
           (stn, st') ss' /\
           istreamD (repr (bedrock_funcs_r types') funcs') meta_env0 vars_env
           is' stn st' sound_or_safe)
   end.
+
+Opaque stateD nstateD.
 
 Theorem ApplySymEval_slice_no_heap : forall types (funcs' : functions (repr bedrock_types_r types)) 
   (preds : SEP.predicates (repr bedrock_types_r types))
@@ -573,7 +561,7 @@ Theorem ApplySymEval_slice_no_heap : forall types (funcs' : functions (repr bedr
                       :: Sig ts (tvWord :: tvWord :: @nil tvar) tvProp (@wlt 32)
                          :: Sig ts (tvType 4 :: @nil tvar) tvWord natToW
                             :: @nil (signature ts)))
-         (Default_signature ts)) funcs') preds algos Regs (@interp _ _) emp star ex inj sound_or_safe cs meta_env stn path 
+         (Default_signature ts)) funcs') preds algos Regs (@interp _ _) emp star ex inj not sound_or_safe cs meta_env stn path 
       sp rp rv pures.
 Proof.
   Opaque sym_eval Env.repr.
@@ -586,6 +574,11 @@ Proof.
       consider (X) ; intros;
         generalize (@Apply_sym_eval_with_eq _ _ _ _ algos_correct _ _ sound_or_safe _ _ H _ _ _ _ H0 H1); auto
   end.
+  { intros. eapply quantD_impl; try eassumption.
+    simpl; intros. destruct sound_or_safe; auto. rewrite nstateD_stateD. auto. }
+  { intros. eapply quantD_impl; try eassumption.
+    simpl; intros. destruct H5. exists x. 
+    rewrite nstateD_stateD. auto. }
 Qed.
 
 Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bedrock_types_r types'))
@@ -595,7 +588,7 @@ Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bed
   (interp : codeSpec W (settings * state) ->
             PropX W (settings * state) -> Prop) (emp : hprop)
   (star : hprop -> hprop -> hprop)
-  (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop)
+  (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop) (not : Prop -> Prop)
   (sound_or_safe : option state) (cs : codeSpec W (settings * state))
   (meta_env : env (repr bedrock_types_r types')) (stn : settings)
   (path : istream (repr bedrock_types_r (repr bedrock_types_r types')))
@@ -613,7 +606,7 @@ Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bed
       (fun vars_env meta_env0 : env (repr bedrock_types_r types') =>
         match sound_or_safe with
           | Some st' =>
-            stateD funcs' preds interp emp star ex inj Regs meta_env0 vars_env cs
+            nstateD funcs' preds interp emp star ex inj not Regs meta_env0 vars_env cs
             (stn, st') ss'
           | None => False
         end)
@@ -621,7 +614,7 @@ Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bed
       quantD nil meta_env qs'
       (fun vars_env meta_env0 : env (repr bedrock_types_r types') =>
         exists st' : state,
-          stateD funcs' preds interp emp star ex inj Regs meta_env0 vars_env cs
+          nstateD funcs' preds interp emp star ex inj not Regs meta_env0 vars_env cs
           (stn, st') ss' /\
           istreamD (repr (bedrock_funcs_r types') funcs') meta_env0 vars_env
           is' stn st' sound_or_safe)
@@ -651,7 +644,7 @@ Theorem ApplySymEval_slice_heap : forall types (funcs' : functions (repr bedrock
                       :: Sig ts (tvWord :: tvWord :: @nil tvar) tvProp (@wlt 32)
                          :: Sig ts (tvType 4 :: @nil tvar) tvWord natToW
                             :: @nil (signature ts)))
-         (Default_signature ts)) funcs') preds algos Regs (@interp _ _) emp star ex inj sound_or_safe cs meta_env stn path sh sp rp rv pures).
+         (Default_signature ts)) funcs') preds algos Regs (@interp _ _) emp star ex inj not sound_or_safe cs meta_env stn path sh sp rp rv pures).
 Proof.
   Opaque sym_eval Env.repr.
   intros.
@@ -667,6 +660,11 @@ Proof.
       consider (X) ; intros;
         generalize (@Apply_sym_eval_with_eq _ _ _ _ algos_correct _ _ sound_or_safe _ _ H _ _ _ _ H0 H1); auto
   end.
+  { intros. eapply quantD_impl; try eassumption.
+    simpl; intros. destruct sound_or_safe; auto. rewrite nstateD_stateD. auto. }
+  { intros. eapply quantD_impl; try eassumption.
+    simpl; intros. destruct H6. exists x. 
+    rewrite nstateD_stateD. auto. }
 Qed.
   
 

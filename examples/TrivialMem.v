@@ -20,9 +20,6 @@ Definition read := bmodule "read" {{
   end
 }}.
 
-Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right associativity).
-
-
 Theorem readOk : moduleOk read.
 (*TIME  Clear Timing Profile. *)
   vcgen; abstract sep_auto.

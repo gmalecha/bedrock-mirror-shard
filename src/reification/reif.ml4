@@ -106,19 +106,31 @@ let recompose_prod
   
   let app,ctxt,rest = aux context len 0 [] [] [] args in
   Term.it_mkLambda_or_LetIn (Term.applistc c (app) ) (ctxt), rest
-    
+
+let split_at_rev (ls : 'a list) (n : int) : 'a list * 'a list =
+  let rec split_at (ls : 'a list) (n : int) (acc : 'a list) : 'a list * 'a list =
+    if n <= 0 then (List.rev acc, ls)
+    else 
+      match ls with
+	| [] -> assert false
+	| l :: ls -> split_at ls (n - 1) (l :: acc)
+  in
+  split_at ls n []
 
 let reify_application env evar term  =
   debug "reify_application:%a\n" pp_constr term;
   let refl_app env evar  term f args =
     let ty = Typing.type_of env evar f in
     let (rel_context, return_type) = Term.decompose_prod_assum ty in 
-    let f, args = recompose_prod rel_context args f return_type in 
+    let f, nargs = recompose_prod rel_context args f return_type in 
     (* This extra bit of typing is a bit painful... *)
     let ty = Typing.type_of env evar f in 
     let (rel_context, return_type) = Term.decompose_prod_assum ty in 
-    let types = List.fold_left (fun acc (_,_,ty) -> ty :: acc ) [] rel_context in 
-    Some (f, types , args, return_type )
+    let types = List.fold_left (fun acc (_,_,ty) -> ty :: acc ) [] rel_context in
+    debug "splitting at %n\n" (List.length nargs) ;
+    let (arg_types, abs_types) = split_at_rev types (List.length nargs) in
+    let ret_type = List.fold_right (fun ty acc -> Term.mkArrow ty acc) abs_types return_type in
+    Some (f, arg_types , nargs, ret_type )
   in
 
   begin match Extlib.decomp_term term with 
@@ -389,13 +401,14 @@ module Bedrock = struct
 	
     let exists env evar f x l =
       try 
-	begin let rec aux eq n = function 
-	  | [] -> raise (Length n)
-	  | t :: q -> if eq (f t) x  then n else aux eq (n+1) q
-	      in
-	      try aux Term.eq_constr 0 l
-	      with
-      		| Length _ -> aux (Reductionops.is_conv env evar) 0 l
+	begin
+	  let rec aux eq n = function 
+	    | [] -> raise (Length n)
+	    | t :: q -> if eq (f t) x  then n else aux eq (n+1) q
+	  in
+	  try aux Term.eq_constr 0 l
+	  with
+      	    | Length _ -> aux (Reductionops.is_conv env evar) 0 l
 	end
       with 
 	| Length n -> raise (Length n)
@@ -602,6 +615,8 @@ module Bedrock = struct
 	    renv, Not e	  
 	  (* special case to add a constant. May fail later. *)
 	  | Term.App (hd,_) when Term.eq_constr hd (Extlib.Logic.exists ()) -> 
+	    debug "reify a variable as a function? %a in reify_expr\n" pp_constr e;
+	    debug "yoyoyo";
 	    let renv, f = Renv.add_func env evar renv e [] (Typing.type_of env evar e) in 
 	    renv, Func (f,[]) 
 	  | _ when Renv.is_const e ->         	  
@@ -610,16 +625,17 @@ module Bedrock = struct
 	    renv, Const (nty,e) 	      
 	  | Term.App (hd, args) ->
 	    debug "Call reify_application with %a in reify_expr\n" pp_constr e;
-	    begin match reify_application env evar e with 
-	      | Some (f,types, args, return) -> 
-		let args, renv = List.fold_right (fun x (args, renv) -> 
-		  let renv, x = reify_expr renv x in 
-		  (x::args, renv)
-		) args ([], renv) in 
-		let renv, f = Renv.add_func env evar renv f types return in 
-		renv, Func (f, args)
-	      | None -> assert false
-	    end		  
+	    begin
+	      match reify_application env evar e with 
+		| Some (f,types, args, return) -> 
+		  let args, renv = List.fold_right (fun x (args, renv) -> 
+		    let renv, x = reify_expr renv x in 
+		    (x::args, renv)
+		  ) args ([], renv) in 
+		  let renv, f = Renv.add_func env evar renv f types return in 
+		  renv, Func (f, args)
+		| None -> assert false
+	    end
 	  | _ ->
 	    let s = Termops.free_rels e in 
 	    if Util.Intset.cardinal s <> 0 then 
@@ -663,7 +679,7 @@ module Bedrock = struct
 		let types = List.fold_left (fun acc (_,_,ty) -> ty:: acc) [] rel_context in 	     
 		(* let f, args = recompose_prod rel_context [||] e return in  *)
 		(* let types = List.map (Typing.type_of env evar) args in   *)
-		let renv, f = Renv.add_func env evar renv e types return in 
+		let renv, f = Renv.add_func env evar renv e [] ty (* types return*) in 
 		renv, Func (f, [])
 	      )
 
@@ -776,6 +792,8 @@ module Bedrock = struct
 	(*   let renv = Renv.push renv in  *)
 	(*   let renv, e = reify_sexpr env evar renv body in  *)
 	(*   Renv.pop renv, e *)
+	| Term.Const _ when Term.eq_constr e (Lazy.force emp) -> (*  (hd, args) when Term.eq_constr hd (Lazy.force emp) -> 	   *)
+	  renv, Emp
 	| Term.App (hd, args) when Term.eq_constr hd (Lazy.force emp) -> 	  
 	  renv, Emp
 	| Term.App (hd, args) when Term.eq_constr hd (Lazy.force inj) -> 

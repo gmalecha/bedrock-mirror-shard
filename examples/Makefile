@@ -1,18 +1,18 @@
 ROOT    := ..
 MODULES := Conditional Lambda \
            AutoSepExt PreAutoSep \
-           Wrap StreamParse ArrayQuery \
+           Wrap \
            AutoSep \
            LemmaTests \
            Baby TrivialMem TrivialMem2 Arr \
-           ConditionalTest LambdaTest StreamParseTest ArrayQueryTest \
-           Indir Factorial Swap TrivialArray \
+           ConditionalTest LambdaTest \
+           Indir Factorial Swap \
            Pair SinglyLinkedList \
            Malloc \
            Sets ListSet TreeSet \
            Bags Queue \
            Memoize
-
+#StreamParse ArrayQuery StreamParseTest ArrayQueryTest TrivialArray 
 VS      := $(MODULES:%=%.v)
 
 .PHONY: coq clean

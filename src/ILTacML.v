@@ -23,22 +23,22 @@ Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right assoc
 (******************)
 Ltac sep_canceller isConst ext :=
 (*TIME  start_timer "sep_canceler:change_to_himp" ; *)
-  (try change_to_himp) ;
+  (try ILTacCommon.change_to_himp) ;
 (*TIME  stop_timer "sep_canceler:change_to_himp" ; *)
 (*TIME  start_timer "sep_canceler:init" ; *)
   let ext' := 
     match ext with
-      | tt => eval cbv delta [ ILAlgoTypes.BedrockPackage.bedrock_package ] in ILAlgoTypes.BedrockPackage.bedrock_package
+      | tt => eval cbv delta [ TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package ] in TacPackIL.ILAlgoTypes.BedrockPackage.bedrock_package
       | _ => eval cbv delta [ ext ] in ext
       | _ => ext
     end
   in
   match goal with 
     | [ |- himp ?L ?R ] =>
-      (let types := reduce_repr ext tt (ILAlgoTypes.PACK.applyTypes (TacPackIL.ILAlgoTypes.Env ext) nil) in
-      let funcs := reduce_repr ext tt (ILAlgoTypes.PACK.applyFuncs (TacPackIL.ILAlgoTypes.Env ext) types (Env.repr (bedrock_funcs_r types) nil)) in
-      let preds := reduce_repr ext tt (ILAlgoTypes.PACK.applyPreds (TacPackIL.ILAlgoTypes.Env ext) types nil) in
-      let all_props := ReifyExpr.collect_props ltac:(ILTacCommon.reflectable shouldReflect) in 
+      (let types := ILTacCommon.reduce_repr ext tt (TacPackIL.ILAlgoTypes.PACK.applyTypes (TacPackIL.ILAlgoTypes.Env ext) nil) in
+      let funcs := ILTacCommon.reduce_repr ext tt (TacPackIL.ILAlgoTypes.PACK.applyFuncs (TacPackIL.ILAlgoTypes.Env ext) types (Env.repr (ILEnv.bedrock_funcs_r types) nil)) in
+      let preds := ILTacCommon.reduce_repr ext tt (TacPackIL.ILAlgoTypes.PACK.applyPreds (TacPackIL.ILAlgoTypes.Env ext) types nil) in
+      let all_props := ReifyExpr.collect_props ltac:(ILTacCommon.reflectable ILTacCommon.shouldReflect) in 
       let pures := all_props in 
                 
       let L := eval unfold empB, injB, injBX, starB, exB, hvarB in L in
@@ -63,20 +63,22 @@ Ltac sep_canceller isConst ext :=
         apply (@CancelTacIL.ApplyCancelSep_slice typesV funcsV predsV 
           (TacPackIL.ILAlgoTypes.Algos ext typesV)
           (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
-          uvars L R puresV puresPfV); 
-        (let bl := constr:(ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
-         let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
-         let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+          uvars L R puresV puresPfV);
+        (let bl := constr:(not ::: ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
+         let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+         let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
          subst funcsV predsV  ;
          evm computed_blacklist [ bl ];
          clear typesV puresV puresPfV ;
          match goal with
-           | |- ?G => let H := fresh in assert (H : G); [ intros | apply H ]
+           | |- ?G => 
+             (let H := fresh in assert (H : G) ; [ | (exact H || simple eapply H) ]) ;
+             intros
          end)
       in
 (*TIME         start_timer "sep_canceler:reify"; *)
-         ((sep_canceler_plugin types funcs preds pures L R k)
-      || fail 10000 "sep_canceler_plugin failed")) (** this just prevents backtracking **)
+      first [ sep_canceler_plugin types funcs preds pures L R k
+            | fail 10000 "sep_canceler_plugin failed" ]) (** this just prevents backtracking **)
     | [ |- ?G ] => 
       idtac "no match" G
   end.
@@ -96,31 +98,37 @@ Ltac sym_eval isConst ext :=
       | [ H : PropX.codeSpec _ _ |- _ ] => H
     end
   in
+  let rec clear_instrs pf :=
+    match pf with
+      | conj ?X ?pf => clear X ; clear_instrs pf
+      | _ => idtac
+    end
+  in
     let finish H  :=
         (*TIME                      start_timer "sym_eval:cleanup" ; *)
-        ((try exact H) 
-           ||
-           (let rec destruct_exs H :=
-                match type of H with
-                  | Logic.ex _ =>
-                      destruct H as [ ? H ] ; destruct_exs H
-                  | forall x : ?T, _ =>
-                      let n := fresh in
-                        evar (n : T); 
-                      let e := eval cbv delta [ n ] in n in 
-                        specialize (H e)                             
-                  | (_ /\ (_ /\ _)) /\ (_ /\ _) =>
-                      destruct H as [ [ ? [ ? ? ] ] [ ? ? ] ];
-                      repeat match goal with
-                               | [ H' : _ /\ _ |- _ ] => destruct H'
-                             end
-                  | False => destruct H
-                  | ?G =>
-                      fail 100000 "bad result goal" G 
-                end
+        first 
+          [ exact H
+          | let rec destruct_exs H :=
+              match type of H with
+                | Logic.ex _ =>
+                  destruct H as [ ? H ] ; destruct_exs H
+                | forall x : ?T, _ =>
+                  let n := fresh in
+                  evar (n : T); 
+                  let e := eval cbv delta [ n ] in n in 
+                  specialize (H e)                             
+                | (_ /\ (_ /\ _)) /\ (_ /\ _) =>
+                  destruct H as [ [ ? [ ? ? ] ] [ ? ? ] ];
+                  repeat match goal with
+                           | [ H' : _ /\ _ |- _ ] => destruct H'
+                         end
+                | False => destruct H
+                | ?G =>
+                  fail 100000 "bad result goal" G 
+              end
             in (* let fresh Hcopy := fresh "Hcopy" in
                  let T := type of H in
-                   assert (Hcopy : T) by apply H; clear H; *) destruct_exs H))
+                   assert (Hcopy : T) by apply H; clear H; *) destruct_exs H ]
     (*TIME                    ;  stop_timer "sym_eval:cleanup" *)
     in
       
@@ -144,9 +152,9 @@ Ltac sym_eval isConst ext :=
       | [ |- _ ] => tt
     end
   in
-  let types := reduce_repr ext tt (ILAlgoTypes.PACK.applyTypes (TacPackIL.ILAlgoTypes.Env ext) nil) in
-  let funcs := reduce_repr ext tt (ILAlgoTypes.PACK.applyFuncs (TacPackIL.ILAlgoTypes.Env ext) types (repr (bedrock_funcs_r types) nil)) in
-  let preds := reduce_repr ext tt (ILAlgoTypes.PACK.applyPreds (TacPackIL.ILAlgoTypes.Env ext) types nil) in
+  let types := ILTacCommon.reduce_repr ext tt (TacPackIL.ILAlgoTypes.PACK.applyTypes (TacPackIL.ILAlgoTypes.Env ext) nil) in
+  let funcs := ILTacCommon.reduce_repr ext tt (TacPackIL.ILAlgoTypes.PACK.applyFuncs (TacPackIL.ILAlgoTypes.Env ext) types (repr (bedrock_funcs_r types) nil)) in
+  let preds := ILTacCommon.reduce_repr ext tt (TacPackIL.ILAlgoTypes.PACK.applyPreds (TacPackIL.ILAlgoTypes.Env ext) types nil) in
   let all_props := ReifyExpr.collect_props ltac:(ILTacCommon.reflectable shouldReflect) in 
   let pures := all_props in 
   match stn_st_SF with
@@ -158,10 +166,10 @@ Ltac sym_eval isConst ext :=
             | (?sp_v, ?sp_pf) => 
               match find_reg st Rv with
                 | (?rv_v, ?rv_pf) => 
-                    let k :=
-                        (fun typesV funcsV uvars predsV rp sp rv is isP fin pures proofs => 
+                    let k := (fun typesV funcsV uvars predsV rp sp rv is isP fin pures proofs => 
                            (*TIME       stop_timer "sym_eval:reify" ; *)
                            (*TIME       start_timer "sym_eval:apply" ; *)
+                      first [
                           (let uvarsV := fresh "uvars" in
                            pose (uvarsV := uvars) ;
                            let isV := fresh "path" in
@@ -176,14 +184,14 @@ Ltac sym_eval isConst ext :=
                            let new := fresh "after" in
                            evar (new : Prop) ;
                            let g := eval cbv delta [ new ] in new in
-                           let result := fresh in
+                           let result := fresh "result" in
                            assert (result : g) by 
                              (generalize (@SymILTac.ApplySymEval_slice_no_heap typesV funcsV predsV
                                  (@TacPackIL.ILAlgoTypes.Algos ext typesV)
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
-                                 stn uvarsV fin st isV isD cs sp_v rv_v rp_v puresV
+                                 stn uvarsV fin st isV isD cs sp rv rp puresV
                                  sp_pf rv_pf rp_pf puresPf) ;
-                                let bl := constr:(Regs ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
+                                let bl := constr:(not ::: Regs ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
                                 let funcs := eval cbv delta [ funcsV ] in funcsV in
                                 let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
                                 let preds := eval cbv delta [ predsV ] in predsV in
@@ -192,11 +200,8 @@ Ltac sym_eval isConst ext :=
                                 evm computed_blacklist [ bl ] ;
                                 refine (fun x => x)) ;
                              clear new puresPf puresV isD isV uvarsV predsV funcsV typesV ;
-(*TODO                             clear_instrs all_instrs ; *)
-                             finish result) || fail 10000 "symbolic evaluation failed (no heap)"
-
-
-
+                             clear_instrs isP ;
+                             finish result) | fail 10000 "symbolic evaluation failed (no heap)" ]
                         (* generalize (@SymILTac.stateD_proof_no_heap types funcs preds *)
                         (*                      uvars st sp rv rp  *)
                         (*                      sp_pf rv_pf rp_pf  *)
@@ -216,8 +221,8 @@ Ltac sym_eval isConst ext :=
                         )                         
                     in
                       (*TIME       start_timer "sym_eval:reify"; *)
-
-                    (sym_eval_nosep   types funcs preds pures rp_v sp_v rv_v st k) || fail 10000 "sym_eval_nosep failed"
+                    first [ (sym_eval_nosep types funcs preds pures rp_v sp_v rv_v st k)
+                          | fail 10000 "sym_eval_nosep failed" ]
               end
           end
       end
@@ -229,7 +234,7 @@ Ltac sym_eval isConst ext :=
                     match find_reg st Rv with
                       | (?rv_v, ?rv_pf) =>                         
                         let k := (fun typesV funcsV uvars predsV rp sp rv is isP fin pures proofs SF =>
-
+                          first [
                           (  let uvarsV := fresh "uvars" in
                              pose (uvarsV := uvars) ;
                              let isV := fresh "path" in
@@ -244,14 +249,14 @@ Ltac sym_eval isConst ext :=
                              let new := fresh "after" in
                              evar (new : Prop) ;
                              let g := eval cbv delta [ new ] in new in
-                             let result := fresh in
+                             let result := fresh "result" in
                              assert (result : g) by  
                                (generalize (@SymILTac.ApplySymEval_slice_heap typesV funcsV predsV
                                  (@TacPackIL.ILAlgoTypes.Algos ext typesV)
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
-                                 stn uvarsV fin st isV isD cs sp_v rv_v rp_v puresV SF
+                                 stn uvarsV fin st isV isD cs sp rv rp puresV SF
                                  sp_pf rv_pf rp_pf puresPf H_interp) ;
-                                let bl := constr:(Regs ::: PropX.interp ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
+                                let bl := constr:(not ::: Regs ::: PropX.interp ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
                                 let funcs := eval cbv delta [ funcsV ] in funcsV in
                                 let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
                                 let preds := eval cbv delta [ predsV ] in predsV in
@@ -260,8 +265,8 @@ Ltac sym_eval isConst ext :=
                                 evm computed_blacklist [ bl ] ;
                                 refine (fun x => x)) ; 
                              clear new H_interp puresPf puresV isD isV uvarsV predsV funcsV typesV ;
-(*TODO                             clear_instrs all_instrs ; *)
-                             finish result) || fail 10000 "symbolic evaluation failed (with heap)" )
+                             clear_instrs isP ;
+                             finish result) | fail 10000 "symbolic evaluation failed (with heap)" ])
 
                            (* (*TIME       stop_timer "sym_eval:reify" ; *) *)
                            (* (*TIME       start_timer "sym_eval:apply" ; *) *)
@@ -281,9 +286,10 @@ Ltac sym_eval isConst ext :=
                            (*  (*TIME       stop_timer "sym_eval:simplify" ; *) *)
                            (*  first [ finish H_interp (* ; clear_instrs all_instrs *) | fail 100000 "finisher failed! (SF)" ]) *)
                         in                         (*TIME       start_timer "sym_eval:reify" ; *)
-                          (sym_eval_sep  types funcs preds pures rp_v sp_v rv_v st SF k) || fail 10000  "bad enough"
+                        first [ (sym_eval_sep types funcs preds pures rp_v sp_v rv_v st SF k)
+                              | fail 10000  "sym_eval_sep failed" ]
                     end                      
               end
         end
-    | ?X => idtac X ; fail 100000 "bad"
+    | ?X => idtac "Called sym_eval on bad goal" X ; fail 100000 "bad"
   end. 

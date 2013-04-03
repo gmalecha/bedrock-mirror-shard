@@ -422,13 +422,35 @@ Section Query.
     -> forall c', conditionBound c'
       -> (bexpTrue (conditionOut c') stn st -> satisfies V (sel V index) (sel V value) c')
       /\ (bexpFalse (conditionOut c') stn st -> ~satisfies V (sel V index) (sel V value) c').
-    clear_fancy; induction c'; simpl; intuition;
+    clear_fancy; induction c'; simpl; intuition.
       try (eapply bool_one; [ eassumption | ]);
         match goal with
           | [ _ : evalCond (expOut ?e1) ?t (expOut ?e2) _ _ = _ |- _ ] =>
             destruct e1; destruct t; destruct e2;
               (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto)
         end.
+      try (eapply bool_one; [ eassumption | ]).
+        match goal with
+          | [ _ : evalCond (expOut ?e1) ?t (expOut ?e2) _ _ = _ |- _ ] =>
+            destruct e1; destruct t; destruct e2
+(*              (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto) *)
+        end.  
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
+        abstract (simpl in *; intuition idtac; prep_locals; evaluate auto_ext; auto).
   Qed.
 
   Lemma condition_satisfies : forall specs V fr stn st ind val,
