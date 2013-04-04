@@ -10,8 +10,8 @@ MODULES := Conditional Lambda \
            Pair SinglyLinkedList \
            Malloc \
            Sets ListSet TreeSet \
-           Bags Queue \
-           Memoize
+           Bags Queue
+#           Memoize
 #StreamParse ArrayQuery StreamParseTest ArrayQueryTest TrivialArray 
 VS      := $(MODULES:%=%.v)
 

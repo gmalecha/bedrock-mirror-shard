@@ -310,6 +310,7 @@ Qed.
 
 Local Hint Resolve exhausted_cases.
 Local Hint Extern 5 (@eq W _ _) => words.
+Local Hint Extern 5 (@eq (word _) _ _) => words.
 Local Hint Extern 3 (himp _ _) => apply bst'_set_extensional.
 
 Theorem bstMOk : moduleOk bstM.

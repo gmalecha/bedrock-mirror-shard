@@ -145,7 +145,7 @@ Qed.
 
 Hint Resolve bound_nat.
 
-Hint Extern 1 (himp _ _ _) => reflexivity.
+Hint Extern 1 (himp _ _) => reflexivity.
 
 Lemma goodSize_prefix : forall a b : list W,
   goodSize (length (a ++ b))

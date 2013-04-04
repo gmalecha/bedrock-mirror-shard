@@ -182,6 +182,7 @@ Definition uslM := bimport [[ "malloc"!"malloc" @ [mallocS], "malloc"!"free" @ [
 }}.
 
 Local Hint Extern 5 (@eq W _ _) => words.
+Local Hint Extern 5 (@eq (word _) _ _) => words.
 Local Hint Extern 3 (himp _ _) => apply usl'_set_extensional.
 
 Lemma contradictory_membership : forall (s : set) v x,

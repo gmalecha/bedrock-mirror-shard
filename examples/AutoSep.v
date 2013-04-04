@@ -48,6 +48,11 @@ Ltac vcgen_simp := cbv beta iota zeta delta [map app imps
 ].
 
 Ltac vcgen :=
-  structured_auto vcgen_simp;
+(*TIME time "vcgen:structured_auto" ( *)
+  structured_auto vcgen_simp 
+(*TIME ) *);
+(*TIME time "vcgen:finish" ( *)
   autorewrite with sepFormula in *; simpl in *;
-    (* unfold starB, hvarB, hpropB in *; fold hprop in *; *) refold.
+(*    change (@starB nil) with (ST.star) in * ; *)
+    unfold hvarB, hpropB in *; fold hprop in *; refold
+(*TIME ) *).

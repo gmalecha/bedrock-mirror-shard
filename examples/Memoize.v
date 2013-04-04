@@ -104,6 +104,11 @@ Hint Extern 1 (@eq W _ _) =>
     | [ |- context[app] ] => fail 1
     | _ => words
   end.
+Hint Extern 1 (@eq (word _) _ _) =>
+  match goal with
+    | [ |- context[app] ] => fail 1
+    | _ => words
+  end.
 
 Hint Extern 1 (interp ?specs (?U ?x ?y)) =>
   match goal with
@@ -171,7 +176,7 @@ Lemma switchUp : forall specs P Q R,
   intros; etransitivity; [ apply himp_star_comm | ]; apply himp_star_frame; auto; reflexivity.
 Qed.
 
-Hint Extern 1 (himp _ _ _) =>
+Hint Extern 1 (himp _ _) =>
   apply switchUp; eapply goodMemo_intro; eassumption.
 
 (* Alternate VC post-processor that understands indirect function calls *)

@@ -33,6 +33,8 @@ Ltac sets := subst;
            | [ H : _ <= _ |- _ ] => generalize dependent H
            | [ H : @eq W _ _ |- _ ] => generalize dependent H
            | [ H : not (@eq W _ _) |- _ ] => generalize dependent H
+           | [ H : @eq (word _) _ _ |- _ ] => generalize dependent H
+           | [ H : not (@eq (word _) _ _) |- _ ] => generalize dependent H
            | [ H : _ \is _ |- _ ] => generalize dependent H
          end; clear;
   unfold equiv, empty, mem, add, del, less, greater, propToWord, IF_then_else; intros;

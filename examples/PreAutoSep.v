@@ -82,7 +82,8 @@ Ltac vcgen :=
 (*TIME ) *);
 (*TIME time "vcgen:finish" ( *)
   autorewrite with sepFormula in *; simpl in *;
-    unfold starB, hvarB, hpropB in *; fold hprop in *; refold
+(*    change (@starB nil) with (ST.star) in * ; *)
+    unfold hvarB, hpropB in *; fold hprop in *; refold
 (*TIME ) *).
 
 Hint Extern 1 => tauto : contradiction.
@@ -1303,7 +1304,7 @@ Ltac sepLemmaLhsOnly :=
     simpl; intros;
       match goal with
         | [ |- _ ===> ?Q ] => sllo Q
-        | [ |- himp _ _ ?Q ] => sllo Q
+        | [ |- himp _ ?Q ] => sllo Q
       end.
 
 Ltac sep_auto := sep' auto_ext.

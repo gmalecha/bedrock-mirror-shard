@@ -29,6 +29,8 @@ Ltac bags := subst;
            | [ H : _ \is _ |- _ ] => generalize dependent H
            | [ H : @eq W _ _ |- _ ] => generalize dependent H
            | [ H : ~(@eq W _ _) |- _ ] => generalize dependent H
+           | [ H : @eq (word _) _ _ |- _ ] => generalize dependent H
+           | [ H : ~(@eq (word _) _ _) |- _ ] => generalize dependent H
          end; clear;
   unfold equiv, empty, mem, add, del, propToWord, IF_then_else; intuition idtac;
     repeat (match goal with

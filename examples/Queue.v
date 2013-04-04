@@ -151,19 +151,21 @@ Module Queue : QUEUE.
     fr <> 0
     -> focusOnBack
     -> llist b n fr ba ===> Ex n', Ex v1, Ex v2, [| n = S n' |] * [| (v1, v2) %in b |] * lseg (b %- (v1, v2)) n' fr ba * [| ba <> 0 |] * [| freeable ba 3 |] * (ba ==*> v1, v2, $0).
+  Proof.
     induction n.
 
     sepLemma.
 
+    intros.
     sepLemmaLhsOnly.
     destruct n.
-    specialize (H4 (refl_equal _)); subst.
+    specialize (x5 (refl_equal _)); subst.
+    sepLemma. 
     sepLemma.
-    sepLemma.
-    clear H4.
-    transitivity ([| x <> 0 |] * llist (b %- (x1, x0)) (S n) x ba *
-      SEP.ST.star (fr =*> x1)
-        (SEP.ST.star ((fr ^+ $4) =*> x0) ((fr ^+ $8) =*> x))).
+    clear x5.
+    transitivity ([| x <> wzero _ |] * llist (b %- (x1, x0)) (S n) x ba *
+      star (fr =*> x1)
+        (star ((fr ^+ $4) =*> x0) ((fr ^+ $8) =*> x))).
     sepLemma.
     remember (S n).
     sepLemmaLhsOnly.
@@ -171,7 +173,7 @@ Module Queue : QUEUE.
     eapply himp_star_frame; [ auto | reflexivity ].
     sepLemma.
     sepLemma.
-    injection H4; clear H4; intros; subst.
+    injection x8; clear x8; intros; subst.
     apply lseg_extensional'; bags.
   Qed.
 
@@ -209,7 +211,7 @@ Module Queue : QUEUE.
 
     destruct n.
     sepLemmaLhsOnly.
-    injection H; clear H; intros; subst.
+    injection x5; clear x5; intros; subst.
     sepLemmaLhsOnly.
     sepLemma.
 
@@ -330,8 +332,9 @@ Definition queueM := bimport [[ "malloc"!"malloc" @ [mallocS], "malloc"!"free" @
 }}.
 
 Local Hint Extern 5 (@eq W _ _) => words.
-Local Hint Extern 1 (himp _ (lseg _ _ _ _) (lseg _ _ _ _)) => apply lseg_extensional'.
-Local Hint Extern 1 (himp _ (llist _ _ _ _) (llist _ _ _ _)) => apply llist_extensional'.
+Local Hint Extern 5 (@eq (word _) _ _) => words.
+Local Hint Extern 1 (himp (lseg _ _ _ _) (lseg _ _ _ _)) => apply lseg_extensional'.
+Local Hint Extern 1 (himp (llist _ _ _ _) (llist _ _ _ _)) => apply llist_extensional'.
 
 Ltac choose E := assert E by constructor.
 
@@ -354,5 +357,6 @@ Ltac combined :=
   end.
 
 Theorem queueMOk : moduleOk queueM.
+(*TIME idtac "queue:verify". Time *)
   vcgen; abstract combined.
-Qed.
+(*TIME Time *)Qed.

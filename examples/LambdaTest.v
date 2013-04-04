@@ -21,6 +21,7 @@ Definition always0 := bmodule "always0" {{
 }}.
 
 Hint Extern 1 (@eq W _ _) => words.
+Hint Extern 1 (@eq (word _) _ _) => words.
 
 Theorem always0Ok : moduleOk always0.
   vcgen; abstract (post; try icall (@nil string); (sep_auto; auto)).
