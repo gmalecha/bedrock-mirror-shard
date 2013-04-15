@@ -1,4 +1,5 @@
 Require Import AutoSep.
+Require Import TimeAbstract.
 
 (** Read from pointers in variables *)
 
@@ -15,7 +16,7 @@ Definition indir := bmodule "indir" {{
 }}.
 
 Theorem indirOk : moduleOk indir.
-  vcgen; abstract sep_auto.
+  vcgen; time_abstract ltac:(sep_auto).
 Qed.
 
 Definition doubleIndirS : spec := SPEC("x") reserving 1
@@ -33,6 +34,7 @@ Definition doubleIndir := bmodule "doubleIndir" {{
 
 Theorem doubleIndirOk : moduleOk doubleIndir.
 (*TIME Clear Timing Profile. *)
-  vcgen; abstract sep_auto.
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep_auto).
 (*TIME Print Timing Profile. *)
 Qed.

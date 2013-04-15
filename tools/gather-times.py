@@ -69,10 +69,10 @@ def print_phase_summary(summary):
     sorted_keys.sort()
     
     # print the accumulator
-    tbl = prettytable.PrettyTable(["Phase", "Total (s)", "Runs"])
+    tbl = prettytable.PrettyTable(["Phase", "Total(s)", "Runs"])
     tbl.set_style(prettytable.PLAIN_COLUMNS)
     tbl.align["Phase"] = "l"
-    tbl.align["Total (s)"] = "r"
+    tbl.align["Total(s)"] = "r"
     tbl.align["Runs"]  = "r"
     
     for k in sorted_keys:
@@ -87,13 +87,13 @@ def print_file_data(data):
             print "%s (elapsed: %s)" % (f, d['SUMMARY']['elapsed'])
         else:
             print f
-        tbl = prettytable.PrettyTable(["Phase", "Total (s)", "Mean (s)", "Runs", "Sigma (s)"])
+        tbl = prettytable.PrettyTable(["Phase", "Total(s)", "Mean(s)", "Runs", "Sigma(s)"])
         tbl.set_style(prettytable.PLAIN_COLUMNS)
         tbl.align["Phase"] = "l"
-        tbl.align["Total (s)"] = "r"
+        tbl.align["Total(s)"] = "r"
         tbl.align["Mean (s)"] = "r"
         tbl.align["Runs"]  = "r"
-        tbl.align["Sigma (s)"]  = "r"        
+        tbl.align["Sigma(s)"]  = "r"        
         tbl.sortby = "Phase"
         for (ph,da) in d.items():
             if not ph == 'SUMMARY':

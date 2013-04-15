@@ -47,7 +47,7 @@ Ltac vcgen_simp := cbv beta iota zeta delta [map app imps
 (*  Query ForArray *)
 ].
 
-Ltac vcgen :=
+Ltac vcgen := idtac;
 (*TIME time "vcgen:structured_auto" ( *)
   structured_auto vcgen_simp 
 (*TIME ) *);

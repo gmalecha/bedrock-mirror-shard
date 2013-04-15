@@ -1,4 +1,5 @@
 Require Import AutoSep Malloc Bags.
+Require Import TimeAbstract.
 
 
 (** * Queue ADT *)
@@ -349,14 +350,16 @@ Ltac chooser :=
     | _ => choose focusOnFront
  end.
 
-Ltac combined :=
+Ltac combined := idtac;
   match goal with
     | [ |- context[Assign (LvMem (Indir Sp (natToW 0))) (RvLval (LvReg Rp)) :: nil] ] =>
       sep' auto_ext (* Easy case; standard automation suffices *)
     | _ => post; chooser; sep hints; auto
   end.
 
+(*TIME Clear Timing Profile. *)
 Theorem queueMOk : moduleOk queueM.
 (*TIME idtac "queue:verify". Time *)
-  vcgen; abstract combined.
+  (time "vcgen:all" vcgen); time_abstract ltac:(combined).
 (*TIME Time *)Qed.
+(*TIME Print Timing Profile. *)

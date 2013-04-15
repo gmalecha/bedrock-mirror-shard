@@ -1,4 +1,5 @@
 Require Import AutoSep.
+Require Import TimeAbstract.
 
 (** A very basic abstract predicate: pairs of words *)
 
@@ -68,7 +69,7 @@ Defined.
 
 Theorem pairOk : moduleOk pair.
   (*TIME idtac "pair:verify". Time *)
-  vcgen; abstract sep hints.
+  (time "vcgen:all" vcgen); time_abstract ltac:(idtac; sep hints).
 Qed.
 
 (*TIME Print Timing Profile. *)

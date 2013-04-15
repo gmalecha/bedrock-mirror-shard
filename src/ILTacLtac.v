@@ -24,7 +24,7 @@ Module SEP_REIFY := ReifySepExpr.ReifySepExpr ST SEP.
  ** - [isConst] is an ltac [* -> bool]
  ** - [ext] is a [TypedPackage .. .. .. .. ..]
  **)
-Ltac sep_canceller isConst ext :=
+Ltac sep_canceler isConst ext :=
   try change_to_himp;
   (let ext' :=
     (match ext with

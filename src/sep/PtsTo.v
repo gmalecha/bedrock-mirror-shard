@@ -1,6 +1,6 @@
 Require Import List.
+Require Import ExtLib.Tactics.Consider.
 Require Import MirrorShard.Expr MirrorShard.SepExpr.
-Require Import MirrorShard.Reflection.
 Require Import MirrorShard.Prover.
 Require Import SymEval.
 Require Import Memory SepIL SymIL.

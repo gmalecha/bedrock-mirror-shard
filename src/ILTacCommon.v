@@ -1,8 +1,7 @@
 Require Import List.
-Require Import MirrorShard.DepList.
 Require Import MirrorShard.Expr MirrorShard.SepExpr MirrorShard.SepCancel.
 Require Import MirrorShard.Prover.
-Require Import MirrorShard.Tactics MirrorShard.Reflection.
+Require Import MirrorShard.Tactics.
 Require Import MirrorShard.ExprUnify.
 
 Require Import PropX.
@@ -16,11 +15,7 @@ Require Import Evm_compute.
 Set Implicit Arguments.
 Set Strict Implicit.
 
-(*TIME
-Add Rec LoadPath "/usr/local/lib/coq/user-contrib/" as Timing.  
-Add ML Path "/usr/local/lib/coq/user-contrib/". 
-Declare ML Module "Timing_plugin".
-*)
+(*TIME Require Import Timing. *)
 
 (** Blacklist **)
 (***************)

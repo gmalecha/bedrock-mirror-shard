@@ -1,12 +1,11 @@
 Require Import List Arith Bool.
 Require Import MirrorShard.Expr MirrorShard.Env.
-Require Import MirrorShard.EqdepClass.
-Require Import MirrorShard.DepList MirrorShard.Prover.
+Require Import MirrorShard.Prover.
 Require Import Word.
 Require Import sep.Array IL.
 
 Set Implicit Arguments.
-
+Set Strict Implicit.
 
 Local Notation pcT := (tvType 0).
 Local Notation stT := (tvType 1).

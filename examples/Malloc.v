@@ -1,5 +1,6 @@
 Require Import AutoSep.
 Require Import Arith List.
+Require Import TimeAbstract.
 
 Set Implicit Arguments.
 
@@ -365,7 +366,7 @@ Section mallocOk.
               apply wplus_lt_lift in H; [ | solve [ eauto ] | solve [ eauto ] ]
         end; sep hints; auto.
 
-  Ltac combined :=
+  Ltac combined := idtac;
     match goal with
       | [ |- context[Times] ] =>
         match goal with
@@ -376,7 +377,7 @@ Section mallocOk.
 
   Theorem mallocMOk : moduleOk mallocM.
 (*TIME idtac "malloc:verify". Time *)
-   Time vcgen; abstract combined.
+   (time "vcgen:all" vcgen); time_abstract ltac:(combined).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

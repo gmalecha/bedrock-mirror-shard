@@ -2,7 +2,8 @@
  ** language defined in IL.v
  **)
 Require Import List.
-Require Import MirrorShard.Tactics MirrorShard.Reflection.
+Require Import ExtLib.Tactics.Consider.
+Require Import MirrorShard.Tactics.
 Require Import MirrorShard.SepExpr SymEval.
 Require Import MirrorShard.Expr MirrorShard.ReifyExpr.
 Require Import MirrorShard.Prover.

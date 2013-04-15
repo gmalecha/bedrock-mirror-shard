@@ -1,7 +1,10 @@
 Require Import Arith NArith Eqdep_dec List.
+Require Import ExtLib.Data.HList.
+Require Import ExtLib.Tactics.Consider.
+Require Import ExtLib.Data.Lists. 
 Require Import MirrorShard.Heaps.
-Require Import MirrorShard.DepList.
 Require Import MirrorShard.MultiMem.
+Require Import ListFacts.
 Require Import Nomega Word Memory PropX PropXTac IL SepTheoryPropX.
 
 Set Implicit Arguments.
@@ -589,8 +592,6 @@ Proof.
   unfold sepFormula_def in H. simpl in H. eapply sheapD_pures in H. auto.
 Qed.
 
-Require Import Reflection.
-
 Theorem interp_WellTyped_sexpr : forall ts funcs (preds : SEP.predicates ts) cs s vars uvars stn m,
   interp cs ((SEP.sexprD funcs preds uvars vars s) stn m) ->
   SEP.WellTyped_sexpr (Expr.typeof_funcs funcs) (SEP.typeof_preds preds) (Expr.typeof_env uvars) (Expr.typeof_env vars) s = true.
@@ -608,7 +609,7 @@ Proof.
     erewrite IHs2; eauto. }
   { eapply STK.interp_ex in H. destruct H.
     eapply IHs in H. simpl in *. auto. }
-  { unfold SEP.typeof_preds. Require Import ListFacts. rewrite map_nth_error_full. destruct (nth_error preds f).
+  { unfold SEP.typeof_preds. rewrite map_nth_error_full. destruct (nth_error preds f).
     { destruct p; simpl in *. generalize dependent SDomain. clear. induction l; destruct SDomain; simpl; intros; auto.
       eapply STK.interp_pure in H. unfold SepExpr.BadPredApply in *. intuition. PropXTac.propxFo.
       consider (Expr.exprD funcs uvars vars a t); intros.

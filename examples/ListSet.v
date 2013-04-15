@@ -1,4 +1,5 @@
 Require Import AutoSep Malloc Sets.
+Require Import TimeAbstract.
 
 Set Implicit Arguments.
 
@@ -196,7 +197,7 @@ Hint Extern 1 => eapply contradictory_membership; eassumption.
 
 Theorem uslMOk : moduleOk uslM.
 (*TIME idtac "tree-set:verify". Time *)
-  Time vcgen; abstract (sep hints; auto).
+  (time "vcgen:all" vcgen); time_abstract ltac:(sep hints; auto).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

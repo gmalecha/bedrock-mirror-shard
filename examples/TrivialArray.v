@@ -1,4 +1,5 @@
 Require Import AutoSep.
+Require Import TimeAbstract.
 
 (** * A trivial example to make sure the array proof automation isn't completely borked *)
 
@@ -166,6 +167,6 @@ Hint Extern 1 (_ < _)%nat => apply lt_goodSize'; [ assumption | | ].
 
 Theorem arraysOk : moduleOk arrays.
 (*TIME  Clear Timing Profile. *)
-  vcgen; abstract (sep_auto; pure).
+  vcgen; time_abstract ltac:(sep_auto; pure).
 (*TIME  Print Timing Profile. *)
 Qed.

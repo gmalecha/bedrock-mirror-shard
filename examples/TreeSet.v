@@ -1,4 +1,5 @@
 Require Import PreAutoSep Malloc Sets.
+Require Import TimeAbstract.
 
 Set Implicit Arguments.
 
@@ -315,7 +316,7 @@ Local Hint Extern 3 (himp _ _) => apply bst'_set_extensional.
 
 Theorem bstMOk : moduleOk bstM.
 (*TIME idtac "tree-set:verify". Time *)
-  Time vcgen; abstract (sep hints; auto).
+  (time "vcgen:all" vcgen); time_abstract ltac:(sep hints; auto).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

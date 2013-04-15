@@ -1,4 +1,5 @@
 Require Import PreAutoSep.
+Require Import TimeAbstract.
 
 (** * A trivial example to make sure the separation logic proof automation isn't completely borked *)
 
@@ -22,6 +23,7 @@ Definition read := bmodule "read" {{
 
 Theorem readOk : moduleOk read.
 (*TIME  Clear Timing Profile. *)
-  vcgen; abstract sep_auto.
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep_auto).
 (*TIME  Print Timing Profile. *)
 Qed.

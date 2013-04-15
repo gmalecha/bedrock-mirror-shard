@@ -1,8 +1,8 @@
 Require Import List Bool.
+Require Import ExtLib.Tactics.Consider.
 Require MirrorShard.CancelTacBedrock.
 Require MirrorShard.ExprUnify.
 Require Import MirrorShard.Expr.
-Require Import MirrorShard.Reflection.
 Require Import MirrorShard.Provers.
 Require Import MirrorShard.SepExprTac.
 Require Import ILEnv SepIL TacPackIL.
@@ -11,10 +11,11 @@ Set Implicit Arguments.
 Set Strict Implicit.
 
 Module CANCEL_TAC := 
-  MirrorShard.CancelTacBedrock.Make SepIL.ST SepIL.SEP SepIL.SH
-                                    TacPackIL.SEP_LEMMA 
-                                    ExprUnify.UNIFIER
-                                    UNF.
+  CancelTacBedrock.Make SepIL.ST SepIL.SEP SepIL.SH
+                        TacPackIL.SEP_LEMMA
+                        SUBST
+                        UNIFY
+                        UNF.
 
 Module SEP_TAC := MirrorShard.SepExprTac.Make SepIL.ST SepIL.SEP.
 
@@ -23,13 +24,13 @@ Section canceller.
   Let types := Env.repr BedrockCoreEnv.core ts.
   
   Definition nsubstInEnv (not : Prop -> Prop) (types : list type) (funcs : functions types)
-    (meta_base var_env : env types) (sub : ExprUnify.UNIFIER.Subst types) :=
+    (meta_base var_env : env types) (sub : SUBST.Subst types) :=
     fix substInEnv (from : nat) (vals : env types) (ret : env types -> Prop)
     {struct vals} : Prop :=
     match vals with
       | nil => ret nil
       | val :: vals0 =>
-        match ExprUnify.UNIFIER.Subst_lookup from sub with
+        match SUBST.Subst_lookup from sub with
           | Some v =>
             match ExprTac.nexprD not _ funcs meta_base var_env v (projT1 val) with
               | Some v' =>
@@ -49,7 +50,7 @@ Section canceller.
 
   Definition nexistsSubst (not : Prop -> Prop) := 
     fun (types : list type) (funcs : functions types) (var_env : env types)
-      (sub : ExprUnify.UNIFIER.Subst types) (from : nat)
+      (sub : SUBST.Subst types) (from : nat)
       (vals : list {t : tvar & option (tvarD types t)}) 
       (ret : env types -> Prop) =>
       CANCEL_TAC.existsMaybe vals

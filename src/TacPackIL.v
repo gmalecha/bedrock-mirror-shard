@@ -2,23 +2,23 @@ Require Import List.
 Require Import MirrorShard.Expr MirrorShard.SepExpr.
 Require Import MirrorShard.Prover.
 Require Import MirrorShard.Env TypedPackage.
+Require MirrorShard.ExprUnifySyn. 
+Require MirrorShard.ReifyExpr ReifySepExpr MirrorShard.ReifyHints.
+Require MirrorShard.Unfolder.
 
 Require Import SymEval.
 Require Import IL SepIL SymIL ILEnv.
-Require MirrorShard.ReifyExpr ReifySepExpr MirrorShard.ReifyHints.
-Require Unfolder.
 
 Set Implicit Arguments.
 Set Strict Implicit.
 
-(*TIME
-Add Rec LoadPath "/usr/local/lib/coq/user-contrib/" as Timing.  
-Add ML Path "/usr/local/lib/coq/user-contrib/". 
-Declare ML Module "Timing_plugin".
-*)
+(*TIME Require Import Timing. *)
 Module SEP_LEMMA := SepLemma.SepLemma ST SEP.
-
-Module UNF := Unfolder.Make ST SEP SH ExprUnify.UNIFIER SEP_LEMMA.
+Require MirrorShard.NatMap.
+Module FM := FMapList.Make NatMap.Ordered_nat.
+Module SUBST := Instantiation.SimpleInstantiation FM.
+Module UNIFY := ExprUnifySyn.SynUnifier SUBST.
+Module UNF := Unfolder.Make ST SEP SH SUBST UNIFY SEP_LEMMA.
 
 Module ILAlgoTypes <: AlgoTypes ST SEP BedrockCoreEnv.
   Module PACK := TypedPackage.Make ST SEP BedrockCoreEnv.

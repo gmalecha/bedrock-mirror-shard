@@ -1,5 +1,5 @@
 Require Import List.
-
+Require Import EquivDec.
 Require MirrorShard.ReifySepExpr.
 Require Import ILTacCommon.
 Require Import SepIL.
@@ -21,8 +21,9 @@ Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right assoc
 
 (** Cancellation **)
 (******************)
-Ltac sep_canceller isConst ext :=
-(*TIME  start_timer "sep_canceler:change_to_himp" ; *)
+Ltac sep_canceler isConst ext :=
+(*TIME  time "sep_canceler:all" (
+   start_timer "sep_canceler:change_to_himp" ; *)
   (try ILTacCommon.change_to_himp) ;
 (*TIME  stop_timer "sep_canceler:change_to_himp" ; *)
 (*TIME  start_timer "sep_canceler:init" ; *)
@@ -45,6 +46,7 @@ Ltac sep_canceller isConst ext :=
       let R := eval unfold empB, injB, injBX, starB, exB, hvarB in R in   
       let k := fun typesV funcsV uvars predsV L R pures proofs =>
 (*TIME         stop_timer "sep_canceler:reify" ; *)
+(*TIME         start_timer "sep_canceler:apply" ; *)
         let funcs := eval cbv delta [ funcsV ] in funcsV in
         let preds := eval cbv delta [ predsV ] in predsV in
         let puresV := fresh "pures" in
@@ -64,11 +66,14 @@ Ltac sep_canceller isConst ext :=
           (TacPackIL.ILAlgoTypes.Algos ext typesV)
           (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
           uvars L R puresV puresPfV);
+(*TIME         stop_timer "sep_canceler:apply" ; *)
+(*TIME         start_timer "sep_canceler:eval" ; *)
         (let bl := constr:(not ::: ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
          let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
          let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
          subst funcsV predsV  ;
          evm computed_blacklist [ bl ];
+(*TIME         stop_timer "sep_canceler:eval" ; *)
          clear typesV puresV puresPfV ;
          match goal with
            | |- ?G => 
@@ -81,12 +86,14 @@ Ltac sep_canceller isConst ext :=
             | fail 10000 "sep_canceler_plugin failed" ]) (** this just prevents backtracking **)
     | [ |- ?G ] => 
       idtac "no match" G
-  end.
+  end
+(*TIME ) *).
 
 (** Symbolic Execution **)
 (************************)
 Ltac sym_eval isConst ext :=
-(*TIME  start_timer "sym_eval:init" ; *)
+(*TIME  time "sym_eval:all" (
+  start_timer "sym_eval:init" ; *)
   let rec init_from st :=
     match goal with
       | [ H : evalInstrs _ ?st' _ = Some st |- _ ] => init_from st'
@@ -191,6 +198,8 @@ Ltac sym_eval isConst ext :=
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                                  stn uvarsV fin st isV isD cs sp rv rp puresV
                                  sp_pf rv_pf rp_pf puresPf) ;
+                           (*TIME       stop_timer "sym_eval:apply" ; *)
+                           (*TIME       start_timer "sym_eval:eval" ; *)
                                 let bl := constr:(not ::: Regs ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
                                 let funcs := eval cbv delta [ funcsV ] in funcsV in
                                 let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
@@ -198,6 +207,7 @@ Ltac sym_eval isConst ext :=
                                 let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
                                 subst funcsV predsV ; 
                                 evm computed_blacklist [ bl ] ;
+                           (*TIME       stop_timer "sym_eval:eval" ; *)
                                 refine (fun x => x)) ;
                              clear new puresPf puresV isD isV uvarsV predsV funcsV typesV ;
                              clear_instrs isP ;
@@ -234,6 +244,8 @@ Ltac sym_eval isConst ext :=
                     match find_reg st Rv with
                       | (?rv_v, ?rv_pf) =>                         
                         let k := (fun typesV funcsV uvars predsV rp sp rv is isP fin pures proofs SF =>
+                           (*TIME       stop_timer "sym_eval:reify" ; *)
+                           (*TIME       start_timer "sym_eval:apply" ; *)
                           first [
                           (  let uvarsV := fresh "uvars" in
                              pose (uvarsV := uvars) ;
@@ -256,6 +268,8 @@ Ltac sym_eval isConst ext :=
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                                  stn uvarsV fin st isV isD cs sp rv rp puresV SF
                                  sp_pf rv_pf rp_pf puresPf H_interp) ;
+                           (*TIME       stop_timer "sym_eval:apply" ; *)
+                           (*TIME       start_timer "sym_eval:eval" ; *)
                                 let bl := constr:(not ::: Regs ::: PropX.interp ::: ex ::: emp ::: star ::: inj ::: Evm_compute.Bnil) in
                                 let funcs := eval cbv delta [ funcsV ] in funcsV in
                                 let bl := add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
@@ -263,6 +277,7 @@ Ltac sym_eval isConst ext :=
                                 let bl := add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
                                 subst funcsV predsV ; 
                                 evm computed_blacklist [ bl ] ;
+                           (*TIME       stop_timer "sym_eval:eval" ; *)
                                 refine (fun x => x)) ; 
                              clear new H_interp puresPf puresV isD isV uvarsV predsV funcsV typesV ;
                              clear_instrs isP ;
@@ -292,4 +307,5 @@ Ltac sym_eval isConst ext :=
               end
         end
     | ?X => idtac "Called sym_eval on bad goal" X ; fail 100000 "bad"
-  end. 
+  end
+(*TIME ) *). 

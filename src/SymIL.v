@@ -2,6 +2,7 @@
  ** language defined in IL.v
  **)
 Require Import List.
+Require Import ExtLib.Tactics.Consider.
 Require Import MirrorShard.Prover.
 Require Import MirrorShard.MultiMem.
 Require Import MirrorShard.Env.
@@ -589,8 +590,6 @@ Section spec_functions.
       clear. intros. rewrite sepFormula_eq. unfold sepFormula_def. simpl in *.
       intuition. eapply memoryIn_sound.
     Qed.
-
-    Require Import Reflection.
 
     Ltac think :=
       repeat match goal with

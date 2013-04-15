@@ -1,9 +1,8 @@
 Require Import Bool List.
-Require Import MirrorShard.DepList.
+Require Import ExtLib.Tactics.Consider.
 Require Import MirrorShard.Expr.
 Require Import MirrorShard.SepExpr.
 Require Import MirrorShard.Env MirrorShard.Prover.
-Require Import MirrorShard.Reflection.
 Require Import SymEval.
 Require Import Word Memory IL SepIL SymIL ILEnv.
 Require Import PropX PropXTac Nomega NArith.

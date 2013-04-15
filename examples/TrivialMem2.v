@@ -1,4 +1,5 @@
 Require Import AutoSep.
+Require Import TimeAbstract.
 
 (** * Like TrivialMem, but tests use of equality prover in symbolic evaluation *)
 
@@ -20,6 +21,7 @@ Definition read := bmodule "read" {{
 
 Theorem readOk : moduleOk read.
 (*TIME  Clear Timing Profile. *)
-  vcgen; abstract sep_auto.
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep_auto).
 (*TIME  Print Timing Profile. *)
 Qed.

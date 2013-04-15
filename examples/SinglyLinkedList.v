@@ -1,5 +1,6 @@
 Require Import AutoSep.
 Require Import List.
+Require Import TimeAbstract.
 
 Set Implicit Arguments.
 
@@ -171,7 +172,7 @@ Ltac finish := repeat match goal with
 
 Theorem sllMOk : moduleOk sllM.
 (*TIME idtac "sll:verify". Time *)
-  Time vcgen; abstract (sep hints; finish).
+  (time "vcgen:all" vcgen); time_abstract ltac:(sep hints; finish).
 (*TIME Time *)
 Qed.
 

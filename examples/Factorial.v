@@ -1,4 +1,5 @@
 Require Import AutoSep.
+Require Import TimeAbstract.
 
 (** Factorial is mandatory, isn't it? *)
 
@@ -45,9 +46,7 @@ Hint Resolve times_1.
 
 Theorem factOk : moduleOk fact.
 (*TIME  Clear Timing Profile. *)
-  vcgen; abstract (sep_auto; eauto; words).
-  (* sep_canceler ltac:(isConst) auto_ext ltac:(hints_ext_simplifier auto_ext).  *)
-  (* simpl. intros. refine (H8 _ _ _ _).  *)
+  (time "vcgen:all" vcgen); time_abstract ltac:(sep_auto; eauto; words).
 (*TIME  Print Timing Profile. *)
 Qed.
 
@@ -80,7 +79,7 @@ Hint Resolve factR_4.
 
 Theorem factDriverOk : moduleOk factDriver.
 (*TIME  Clear Timing Profile. *)
-  vcgen; abstract (sep_auto; words).
+  (time "vcgen:all" vcgen); time_abstract ltac:(sep_auto; words).
 (*TIME  Print Timing Profile. *)
 Qed.
 

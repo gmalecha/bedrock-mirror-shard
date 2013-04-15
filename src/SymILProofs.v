@@ -2,7 +2,7 @@
  ** language defined in IL.v
  **)
 Require Import List.
-Require Import MirrorShard.EqdepClass.
+Require Import ExtLib.Tactics.Consider.
 Require Import MirrorShard.SepExpr.
 Require Import MirrorShard.Expr.
 Require Import MirrorShard.Prover.
@@ -252,14 +252,14 @@ Module SymIL_Correct.
                  | [ |- context [ evalRvalue ?A ?B ?C ] ] => 
                    case_eq (evalRvalue A B C); intros
                  | [ |- context [ evalTest ?A ?B ?C ] ] => 
-                   Reflection.consider (evalTest A B C); intros
+                   consider (evalTest A B C); intros
                  | [ b : binop |- _ ] => 
                    destruct b; unfold fPlus, fMinus, fMult in *; simpl in *
                  | [ |- _ ] => progress t_correct
                end; unfold IL.weqb, IL.wneb, wltb, wleb in *; simpl in *;
         repeat match goal with
                  | [ H : (if ?X then _ else _) = _ |- _ ] =>
-                   revert H; Reflection.consider X; try congruence
+                   revert H; consider X; try congruence
                  | [ H : Some _ = Some _ |- _ ] => inversion H; clear H; subst
                  | [ H : ?X = _ , H' : ?X = _ |- _ ] => rewrite H in H'
                  | [ |- context [ wlt_dec ?X ?Y ] ] =>
@@ -467,7 +467,7 @@ Module SymIL_Correct.
     Qed.
     Hint Resolve stateD_weaken_vars stateD_weaken_uvars : stateD_solver.
     Require ListFacts.
-    Require Import Tactics Reflection.
+    Require Import MirrorShard.Tactics.
     Hint Resolve ListFacts.not_sure ListFacts.map_skipn_all_map_is_nil ListFacts.map_skipn_all_map : env_resolution.
 
     Lemma sym_locD_weaken : forall ts X A C Y Z,
@@ -548,7 +548,7 @@ Module SymIL_Correct.
       Folds.all2 Expr.tvar_seqb a b = true -> a = b.
     Proof.
       clear; induction a; destruct b; simpl; intros; try congruence.
-      consider (tvar_seqb a t). intros. erewrite IHa; auto.
+      consider (tvar_seqb a t); intros; subst. erewrite IHa; auto.
     Qed.
 
     Lemma sym_evalStream_quant_append : forall path facts qs uvars vars ss res,

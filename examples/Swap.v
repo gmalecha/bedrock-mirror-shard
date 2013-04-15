@@ -1,4 +1,5 @@
 Require Import AutoSep.
+Require Import TimeAbstract.
 
 (** Swapping two pointers *)
 
@@ -19,6 +20,6 @@ Definition swap := bmodule "swap" {{
 
 Theorem swapOk : moduleOk swap.
 (*TIME Clear Timing Profile. *)
-  vcgen; abstract sep_auto.
+  (time "vcgen:all" vcgen); time_abstract ltac:(sep_auto).
 (*TIME Print Timing Profile. *)
 Qed.

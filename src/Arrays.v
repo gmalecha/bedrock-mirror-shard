@@ -187,7 +187,13 @@ Qed.
 
 Hint Rewrite sel_middle using solve [ auto ] : Arr.
 
-Hint Rewrite natToWord_wordToNat DepList.pf_list_simpl : Arr.
+Theorem pf_list_simpl : forall A c (a : list A) b,
+  (a ++ b :: nil) ++ c = a ++ b :: c.
+Proof.
+  intros. rewrite app_ass. simpl. reflexivity.
+Qed.
+
+Hint Rewrite natToWord_wordToNat pf_list_simpl : Arr.
 Hint Rewrite <- plus_n_O : Arr.
 
 Lemma sel_middle' : forall ws w ws' n,
@@ -207,7 +213,7 @@ Lemma upd0 : forall w ws v,
   intros; unfold Array.upd; autorewrite with Arr; reflexivity.
 Qed.
 
-Hint Rewrite upd0 natToWord_wordToNat DepList.pf_list_simpl : Arr.
+Hint Rewrite upd0 natToWord_wordToNat : Arr.
 Hint Rewrite <- plus_n_O : Arr.
 
 Require Import Arith.

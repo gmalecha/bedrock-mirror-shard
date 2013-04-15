@@ -1,5 +1,6 @@
 ROOT    := ..
-MODULES := Conditional Lambda \
+MODULES := TimeAbstract \
+	   Conditional Lambda \
            AutoSepExt PreAutoSep \
            Wrap \
            AutoSep \

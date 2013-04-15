@@ -1,7 +1,6 @@
 Require Import List Arith Bool.
 Require Import MirrorShard.Expr MirrorShard.Env.
-Require Import MirrorShard.EqdepClass.
-Require Import MirrorShard.DepList MirrorShard.Prover.
+Require Import MirrorShard.Prover.
 Require Import Word.
 
 Set Implicit Arguments.

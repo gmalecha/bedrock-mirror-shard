@@ -1,4 +1,4 @@
-Require Import List DepList Word Memory.
+Require Import List Word Memory.
 Require Import PropX.
 Require Import Env.
 
