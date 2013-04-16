@@ -197,7 +197,8 @@ Hint Extern 1 => eapply contradictory_membership; eassumption.
 
 Theorem uslMOk : moduleOk uslM.
 (*TIME idtac "tree-set:verify". Time *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(sep hints; auto).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep hints; auto).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

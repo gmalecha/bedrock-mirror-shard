@@ -69,7 +69,8 @@ Defined.
 
 Theorem pairOk : moduleOk pair.
   (*TIME idtac "pair:verify". Time *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(idtac; sep hints).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(idtac; sep hints).
 Qed.
 
 (*TIME Print Timing Profile. *)

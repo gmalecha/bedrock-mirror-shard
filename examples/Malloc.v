@@ -377,7 +377,8 @@ Section mallocOk.
 
   Theorem mallocMOk : moduleOk mallocM.
 (*TIME idtac "malloc:verify". Time *)
-   (time "vcgen:all" vcgen); time_abstract ltac:(combined).
+(*TIME   (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(combined).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

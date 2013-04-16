@@ -360,6 +360,7 @@ Ltac combined := idtac;
 (*TIME Clear Timing Profile. *)
 Theorem queueMOk : moduleOk queueM.
 (*TIME idtac "queue:verify". Time *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(combined).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(combined).
 (*TIME Time *)Qed.
 (*TIME Print Timing Profile. *)

@@ -316,7 +316,8 @@ Local Hint Extern 3 (himp _ _) => apply bst'_set_extensional.
 
 Theorem bstMOk : moduleOk bstM.
 (*TIME idtac "tree-set:verify". Time *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(sep hints; auto).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep hints; auto).
 (*TIME Time *)Qed.
 
 (*TIME Print Timing Profile. *)

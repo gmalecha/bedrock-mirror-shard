@@ -46,7 +46,8 @@ Hint Resolve times_1.
 
 Theorem factOk : moduleOk fact.
 (*TIME  Clear Timing Profile. *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(sep_auto; eauto; words).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep_auto; eauto; words).
 (*TIME  Print Timing Profile. *)
 Qed.
 
@@ -79,7 +80,8 @@ Hint Resolve factR_4.
 
 Theorem factDriverOk : moduleOk factDriver.
 (*TIME  Clear Timing Profile. *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(sep_auto; words).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep_auto; words).
 (*TIME  Print Timing Profile. *)
 Qed.
 

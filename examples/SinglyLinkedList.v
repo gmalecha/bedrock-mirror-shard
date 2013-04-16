@@ -172,7 +172,8 @@ Ltac finish := repeat match goal with
 
 Theorem sllMOk : moduleOk sllM.
 (*TIME idtac "sll:verify". Time *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(sep hints; finish).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep hints; finish).
 (*TIME Time *)
 Qed.
 

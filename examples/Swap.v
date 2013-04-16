@@ -20,6 +20,7 @@ Definition swap := bmodule "swap" {{
 
 Theorem swapOk : moduleOk swap.
 (*TIME Clear Timing Profile. *)
-  (time "vcgen:all" vcgen); time_abstract ltac:(sep_auto).
+(*TIME  (time "vcgen:all" *) vcgen
+(*TIME ) *); time_abstract ltac:(sep_auto).
 (*TIME Print Timing Profile. *)
 Qed.
