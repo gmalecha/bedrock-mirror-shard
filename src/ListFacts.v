@@ -1,6 +1,6 @@
 Require Import List.
 Require Import Omega.
-Require Import MirrorShard.Tactics.
+Require Import Tactics.
 Require Import ExtLib.Tactics.Consider.
 
 Lemma skipn_length_gt : forall T (ls : list T) n,

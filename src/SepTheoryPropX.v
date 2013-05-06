@@ -1,5 +1,4 @@
 Require Import RelationClasses.
-Require Import Heaps.
 Require Import PropX PropXTac.
 Require Import MirrorShard.SepTheory.
 Require Import MirrorShard.Heaps.

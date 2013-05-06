@@ -10,7 +10,7 @@ Require Import IL SepIL.
 Require Import Word Memory.
 Require Import SymILTac CancelTacIL.
 
-Require Import Evm_compute.
+Require evm_compute.Evm_compute.
 
 Set Implicit Arguments.
 Set Strict Implicit.

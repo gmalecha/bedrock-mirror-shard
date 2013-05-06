@@ -21,11 +21,11 @@ Definition allWords_def (width : nat) :=
 Fixpoint memoryInUpto (width init : nat) (m : word width -> option B)
   : hlist (fun _ => option B) (allWordsUpto width init) :=
   match init with
-    | O => HNil
+    | O => Hnil
     | S init' =>
       let w := natToWord width init' in
       let v := m w in
-      HCons v (memoryInUpto (width := width) init' m)
+      Hcons v (memoryInUpto (width := width) init' m)
   end.
 
 Definition memoryIn_def (width : nat) :=

@@ -1,8 +1,8 @@
 Require Import OrderedType FMapAVL.
 Require Import List.
 Require Import Setoid RelationClasses.
-Require Import MirrorShard.Reflection.
 Require Import NPeano.
+Require Import ExtLib.Tactics.Consider.
 
 Set Implict Arguments.
 Set Strict Implicit.
@@ -116,8 +116,7 @@ Definition singleton {T} (k : nat) (v : T) : IntMap.t T :=
   IntMap.add k v (IntMap.empty _).
 
 (** Neither Properties nor Facts contains anything useful about 'map' **)
-Module MoreFMapFacts (FM : FMapInterface.WS)
-. 
+Module MoreFMapFacts (FM : FMapInterface.WS). 
   Module PROPS := FMapFacts.WProperties_fun(FM.E) FM.
   Module FACTS := FMapFacts.WFacts_fun FM.E FM.    
 
