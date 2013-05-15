@@ -8,6 +8,7 @@ Local Hint Extern 3 (himp _ _) => apply himp_star_frame.
 Local Hint Extern 3 (himp _ _) => apply himp_star_frame_comm.
 
 Module Type USL. (* For "unsorted list" *)
+
   Parameter usl' : set -> nat -> W -> HProp.
   Parameter usl : set -> W -> HProp.
 

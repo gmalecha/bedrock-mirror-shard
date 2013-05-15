@@ -21,7 +21,7 @@ Local Notation "a ::: b" := (@Evm_compute.Bcons _ a b) (at level 60, right assoc
 
 (** Cancellation **)
 (******************)
-Ltac sep_canceler isConst ext :=
+Ltac sep_canceler bf bb isConst ext :=
 (*TIME  time "sep_canceler:all" (
    start_timer "sep_canceler:change_to_himp" ; *)
   (try ILTacCommon.change_to_himp) ;
@@ -62,7 +62,7 @@ Ltac sep_canceler isConst ext :=
               Peano_dec.eq_nat_dec nat_rec nat_rect eq_rec_r eq_rect eq_rec 
               f_equal eq_sym ]; exact proofs ) ; 
         change (SEP.himp funcsV predsV uvars nil L R) ;
-        apply (@CancelTacIL.ApplyCancelSep_slice typesV funcsV predsV 
+        apply (@CancelTacIL.ApplyCancelSep_slice bf bb typesV funcsV predsV 
           (TacPackIL.ILAlgoTypes.Algos ext typesV)
           (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
           uvars L R puresV puresPfV);
@@ -74,12 +74,12 @@ Ltac sep_canceler isConst ext :=
          subst funcsV predsV  ;
          evm computed_blacklist [ bl ];
 (*TIME         stop_timer "sep_canceler:eval" ; *)
-         clear typesV puresV puresPfV ;
+         clear typesV puresV puresPfV (* ;
          match goal with
            | |- ?G => 
              (let H := fresh in assert (H : G) ; [ | (exact H || simple eapply H) ]) ;
              intros
-         end)
+         end *) )
       in
 (*TIME         start_timer "sep_canceler:reify"; *)
       first [ sep_canceler_plugin types funcs preds pures L R k
@@ -91,7 +91,7 @@ Ltac sep_canceler isConst ext :=
 
 (** Symbolic Execution **)
 (************************)
-Ltac sym_eval isConst ext :=
+Ltac sym_eval bf isConst ext :=
 (*TIME  time "sym_eval:all" (
   start_timer "sym_eval:init" ; *)
   let rec init_from st :=
@@ -193,7 +193,7 @@ Ltac sym_eval isConst ext :=
                            let g := eval cbv delta [ new ] in new in
                            let result := fresh "result" in
                            assert (result : g) by 
-                             (generalize (@SymILTac.ApplySymEval_slice_no_heap typesV funcsV predsV
+                             (generalize (@SymILTac.ApplySymEval_slice_no_heap bf typesV funcsV predsV
                                  (@TacPackIL.ILAlgoTypes.Algos ext typesV)
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                                  stn uvarsV fin st isV isD cs sp rv rp puresV
@@ -263,7 +263,7 @@ Ltac sym_eval isConst ext :=
                              let g := eval cbv delta [ new ] in new in
                              let result := fresh "result" in
                              assert (result : g) by  
-                               (generalize (@SymILTac.ApplySymEval_slice_heap typesV funcsV predsV
+                               (generalize (@SymILTac.ApplySymEval_slice_heap bf typesV funcsV predsV
                                  (@TacPackIL.ILAlgoTypes.Algos ext typesV)
                                  (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
                                  stn uvarsV fin st isV isD cs sp rv rp puresV SF

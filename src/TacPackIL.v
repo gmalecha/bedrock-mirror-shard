@@ -2,7 +2,7 @@ Require Import List.
 Require Import MirrorShard.Expr MirrorShard.SepExpr.
 Require Import MirrorShard.Prover.
 Require Import MirrorShard.Env TypedPackage.
-Require MirrorShard.ExprUnifySyn. 
+Require MirrorShard.ExprUnifySynGenRec. 
 Require MirrorShard.ReifyExpr ReifySepExpr MirrorShard.ReifyHints.
 Require MirrorShard.Unfolder.
 
@@ -16,8 +16,9 @@ Set Strict Implicit.
 Module SEP_LEMMA := SepLemma.SepLemma ST SEP.
 Require MirrorShard.NatMap.
 Module FM := FMapList.Make NatMap.Ordered_nat.
-Module SUBST := Instantiation.SimpleInstantiation FM.
-Module UNIFY := ExprUnifySyn.SynUnifier SUBST.
+Require MirrorShard.SimpleInstantiation.
+Module SUBST := SimpleInstantiation.Make FM.
+Module UNIFY := ExprUnifySynGenRec.Make SUBST.
 Module UNF := Unfolder.Make ST SEP SH SUBST UNIFY SEP_LEMMA.
 
 Module ILAlgoTypes <: AlgoTypes ST SEP BedrockCoreEnv.

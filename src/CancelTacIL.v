@@ -22,45 +22,66 @@ Module SEP_TAC := MirrorShard.SepExprTac.Make SepIL.ST SepIL.SEP.
 Section canceller.
   Variable ts : list Expr.type.
   Let types := Env.repr BedrockCoreEnv.core ts.
-  
-  Definition nsubstInEnv (not : Prop -> Prop) (types : list type) (funcs : functions types)
-    (meta_base var_env : env types) (sub : SUBST.Subst types) :=
-    fix substInEnv (from : nat) (vals : env types) (ret : env types -> Prop)
-    {struct vals} : Prop :=
+
+  Definition nexistsSubst (not : Prop -> Prop) (types : list type) (funcs : functions types) (sub : SUBST.Subst types) :=
+    fix existsSubst (meta vars : env types) (from : nat) 
+    (vals : list tvar) (ret : env types -> Prop) {struct vals} : Prop :=
     match vals with
-      | nil => ret nil
-      | val :: vals0 =>
+      | nil => ret meta
+      | t :: ts =>
         match SUBST.Subst_lookup from sub with
           | Some v =>
-            match ExprTac.nexprD not _ funcs meta_base var_env v (projT1 val) with
-              | Some v' =>
-                projT2 val = v' /\
-                substInEnv (S from) vals0
-                (fun e : env types =>
-                  ret (existT (tvarD types) (projT1 val) v' :: e))
-              | None => CANCEL_TAC.ExistsSubstNone (projT1 val) v
+            match exprD funcs meta vars v t with
+              | Some v0 =>
+                existsSubst (meta ++ existT (tvarD types) t v0 :: nil) vars
+                (S from) ts ret
+              | None =>
+                exists x : tvarD types t,
+                  existsSubst (meta ++ existT (tvarD types) t x :: nil) vars
+                  (S from) ts
+                  (fun g : env types =>
+                    match exprD funcs g vars v t with
+                      | Some y => x = y /\ ret g
+                      | None => False
+                    end)
             end
           | None =>
-            substInEnv (S from) vals0 (fun e : env types => ret (val :: e))
+            exists x : tvarD types t,
+              existsSubst (meta ++ existT (tvarD types) t x :: nil) vars
+              (S from) ts ret
         end
     end.
 
-  Theorem nsubstInEnv_substInEnv : nsubstInEnv not = CANCEL_TAC.substInEnv.
+  Theorem nexistsSubst_existsSubst : nexistsSubst not = CANCEL_TAC.INS.existsSubst. 
   Proof. reflexivity. Qed.
 
-  Definition nexistsSubst (not : Prop -> Prop) := 
-    fun (types : list type) (funcs : functions types) (var_env : env types)
-      (sub : SUBST.Subst types) (from : nat)
-      (vals : list {t : tvar & option (tvarD types t)}) 
-      (ret : env types -> Prop) =>
-      CANCEL_TAC.existsMaybe vals
-      (fun e : env types => nsubstInEnv not funcs e var_env sub from e ret).
+  Definition nSubst_equations_to (not : Prop -> Prop) (types : list type) (funcs : functions types) (uenv venv : env types)
+    (subst : SUBST.Subst types) from ls (rr : Prop) :=
+    (fix Subst_equations_to (from : nat) (ls : env types) {struct ls} : Prop :=
+    match ls with
+      | nil => rr
+      | l :: ls0 =>
+        match SUBST.Subst_lookup from subst with
+          | Some e =>
+            match ExprTac.nexprD not types funcs uenv venv e (projT1 l) with
+              | Some v => projT2 l = v
+              | None => False
+            end
+          | None => True
+        end /\ Subst_equations_to (S from) ls0
+    end) from ls.
   
-  Theorem nexistsSubst_existsSubst : nexistsSubst not = CANCEL_TAC.existsSubst.
-  Proof. reflexivity. Qed.
-
+  Theorem nSubst_equations_to_Subst_equations_to : forall ts fs u v s r ls from,
+    @nSubst_equations_to not ts fs u v s from ls r <-> @SUBST.Subst_equations_to ts fs u v s from ls /\ r.
+  Proof. 
+    induction ls; simpl.
+    { intuition. }
+    { intros. rewrite IHls. intuition. }
+  Qed.
+  
   Definition cancel (himp : hprop -> hprop -> Prop) (emp : hprop) (star : hprop -> hprop -> hprop) 
     (ex : forall T : Type, (T -> hprop) -> hprop) (inj : Prop -> hprop) (not : Prop -> Prop)
+    (boundf boundb : nat)
     (ts : list Expr.type)
     (funcs : Expr.functions (Env.repr ILEnv.BedrockCoreEnv.core ts))
     (preds : SEP.predicates (Env.repr ILEnv.BedrockCoreEnv.core ts))
@@ -69,7 +90,6 @@ Section canceller.
     (lhs rhs : SEP.sexpr (Env.repr ILEnv.BedrockCoreEnv.core ts))
     (hyps : Expr.exprs (Env.repr ILEnv.BedrockCoreEnv.core ts)) : Prop :=
     let types := Env.repr ILEnv.BedrockCoreEnv.core ts in
-    let bound := 10 in
     let hints :=
       match TacPackIL.ILAlgoTypes.Hints algos with
         | Some x => x
@@ -86,7 +106,7 @@ Section canceller.
     let tfuncs := typeof_funcs funcs in
     let tpreds := SEP.typeof_preds preds in
     if SEP.WellTyped_sexpr tfuncs tpreds (typeof_env uvars) nil rhs then
-      match CANCEL_TAC.canceller tpreds (TacPackIL.UNF.Forward hints) (TacPackIL.UNF.Backward hints) prover (typeof_env uvars) hyps lhs rhs with
+      match CANCEL_TAC.canceller tpreds (TacPackIL.UNF.Forward hints) (TacPackIL.UNF.Backward hints) prover boundf boundb (typeof_env uvars) hyps lhs rhs with
         | None => 
           himp (SEP_TAC.nsexprD not emp star ex inj types funcs preds uvars nil lhs)
                (SEP_TAC.nsexprD not emp star ex inj types funcs preds uvars nil rhs)
@@ -98,39 +118,29 @@ Section canceller.
           forallEach new_vars (fun nvs : env types =>
              let var_env := nvs in
              ExprTac.nAllProvable_impl not _ funcs uvars var_env
-               (nexistsSubst not funcs var_env subst 0
-                 (map
-                   (fun x : sigT (tvarD types) =>
-                       existT (fun t : tvar => option (tvarD types t))
-                         (projT1 x) (Some (projT2 x))) uvars ++
-                    map
-                      (fun x : tvar =>
-                       existT (fun t : tvar => option (tvarD types t)) x None)
-                      new_uvars)
-                   (fun meta_env0 : env types =>
-                    ExprTac.nAllProvable_and not _ funcs meta_env0 var_env
-                      (himp
-                         (SEP_TAC.nsexprD not emp star ex inj types funcs preds meta_env0 var_env
-                            (SH.sheapD
-                               {|
-                               SH.impures := SH.impures lhs';
-                               SH.pures := nil;
-                               SH.other := SH.other lhs' |}))
-                         (SEP_TAC.nsexprD not emp star ex inj types funcs preds meta_env0 var_env
-                            (SH.sheapD
-                               {|
-                               SH.impures := SH.impures rhs';
-                               SH.pures := nil;
-                               SH.other := SH.other rhs' |})))
-                      (SH.pures rhs'))) (SH.pures lhs'))
+               (nexistsSubst not funcs subst uvars var_env (length uvars) new_uvars
+                 (fun meta_env0 : env types =>
+                    nSubst_equations_to not funcs meta_env0 var_env subst 0 uvars 
+                      (ExprTac.nAllProvable_and not _ funcs meta_env0 var_env
+                        (himp
+                           (SEP_TAC.nsexprD not emp star ex inj types funcs preds meta_env0 var_env
+                              (SH.sheapD
+                                 {| SH.impures := SH.impures lhs'
+                                  ; SH.pures := nil
+                                  ; SH.other := SH.other lhs' |}))
+                           (SEP_TAC.nsexprD not emp star ex inj types funcs preds meta_env0 var_env
+                              (SH.sheapD
+                                 {| SH.impures := SH.impures rhs'
+                                  ; SH.pures := nil
+                                  ; SH.other := SH.other rhs' |})))
+                        (SH.pures rhs')))) (SH.pures lhs'))
 
-      end
+        end
     else
       himp (SEP_TAC.nsexprD not emp star ex inj types funcs preds uvars nil lhs)
            (SEP_TAC.nsexprD not emp star ex inj types funcs preds uvars nil rhs).
-      
 
-  Theorem ApplyCancelSep_slice : forall (ts : list Expr.type)
+  Theorem ApplyCancelSep_slice (boundf boundb : nat) : forall (ts : list Expr.type)
       (funcs : Expr.functions (Env.repr ILEnv.BedrockCoreEnv.core ts))
       (preds : SEP.predicates (Env.repr ILEnv.BedrockCoreEnv.core ts))
       (algos : TacPackIL.ILAlgoTypes.AllAlgos
@@ -140,18 +150,7 @@ Section canceller.
         (lhs rhs : SEP.sexpr (Env.repr ILEnv.BedrockCoreEnv.core ts))
         (hyps : Expr.exprs (Env.repr ILEnv.BedrockCoreEnv.core ts)),
         Expr.AllProvable funcs uvars nil hyps ->
-        (cancel himp emp star ex inj not funcs preds algos uvars lhs rhs hyps) ->
-(*           
-         let '(x, y) :=
-           CancelTacIL.CANCEL_LOOP.cancel (SEP.typeof_preds preds)
-           prover (TacPackIL.UNF.Forward hints)
-           (TacPackIL.UNF.Backward hints) bound hyps
-           (Expr.typeof_env uvars) nil lhs rhs in
-           if (SEP.WellTyped_sexpr (Expr.typeof_funcs funcs)
-             (SEP.typeof_preds preds) (Expr.typeof_env uvars) nil rhs && y)%bool
-           then ncancelResultD himp emp star ex inj funcs preds uvars nil x
-           else himp (nsexprD emp star ex inj funcs preds uvars nil lhs)
-                     (nsexprD emp star ex inj funcs preds uvars nil rhs)) -> *)
+        (cancel himp emp star ex inj not boundf boundb funcs preds algos uvars lhs rhs hyps) ->
         SEP.himp funcs preds uvars nil lhs rhs.
   Proof.
     Opaque Env.repr.
@@ -171,7 +170,7 @@ Section canceller.
            match ILAlgoTypes.Prover algos with
            | Some x => x
            | None => trivialProver (Env.repr BedrockCoreEnv.core ts0)
-           end (typeof_env uvars) hyps lhs rhs); intros.
+           end boundf boundb (typeof_env uvars) hyps lhs rhs); intros.
     { eapply CANCEL_TAC.ApplyCancelSep_with_eq in H1; eauto. 
       { destruct X. destruct (ILAlgoTypes.Hints algos); eauto using UNF.ForwardOk.
         simpl. constructor. }
@@ -185,9 +184,11 @@ Section canceller.
         rewrite ExprTac.nAllProvable_impl_AllProvable_impl in H2.
         apply AllProvable_impl_sem; intros.
         apply AllProvable_impl_sem in H2; eauto.
-        eapply CANCEL_TAC.existsSubst_sem in H2. eapply existsEach_sem in H2. destruct H2; intuition.
-        eapply CANCEL_TAC.existsSubst_sem. eapply existsEach_sem. exists x. intuition.
-        rewrite ExprTac.nAllProvable_and_AllProvable_and in H8. auto. } }
+        eapply CANCEL_TAC.INS.existsSubst_sem in H2. eapply existsEach_sem in H2. destruct H2; intuition.
+        eapply CANCEL_TAC.INS.existsSubst_sem. eapply existsEach_sem. exists x.
+        change (fun A : Prop => A -> False) with not in *.
+        rewrite nSubst_equations_to_Subst_equations_to in *. intuition.
+        rewrite ExprTac.nAllProvable_and_AllProvable_and in H8. intuition. } }
     { apply H2. }
   Qed.
 

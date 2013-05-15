@@ -30,12 +30,13 @@ Section unfolder_learnhook.
   Variable types : list type.
   Variable hints : UNF.hintsPayload (repr bedrock_types_r types).
 
-  Definition unfolder_LearnHook : MEVAL.LearnHook (repr bedrock_types_r types) 
+  Definition unfolder_LearnHook (fuelf : nat) 
+    : MEVAL.LearnHook (repr bedrock_types_r types) 
     (SymState (repr bedrock_types_r types)) :=
     fun prover meta_vars vars_vars st facts ext => 
       match SymMem st with
         | Some m =>
-          match fst (UNF.forward (UNF.Forward hints) prover 10 facts
+          match fst (UNF.forward (UNF.Forward hints) prover fuelf facts
             {| UNF.Vars := vars_vars
              ; UNF.UVars := meta_vars
              ; UNF.Heap := m
@@ -81,16 +82,16 @@ Section unfolder_learnhook.
     PropXTac.propxFo. subst. eapply split_emp in H; eauto. unfold smem_eqv in *. subst; auto.
   Qed.
 
-  Theorem unfolderLearnHook_correct 
-    : @MEVAL.LearnHook_correct (repr bedrock_types_r types) _ BedrockCoreEnv.pc BedrockCoreEnv.st (@unfolder_LearnHook) 
+  Theorem unfolderLearnHook_correct : forall fuelf, 
+    @MEVAL.LearnHook_correct (repr bedrock_types_r types) _ BedrockCoreEnv.pc BedrockCoreEnv.st (@unfolder_LearnHook fuelf) 
     (@stateD _ funcs preds) funcs preds.
   Proof.
     Opaque repr UNF.forward.
-    unfold unfolder_LearnHook. econstructor. intros. generalize dependent 10. intros.
+    unfold unfolder_LearnHook. econstructor. intros. 
 
     destruct ss. simpl in *.
     destruct SymMem; simpl; intros.
-    { remember (UNF.forward (UNF.Forward hints) P n pp
+    { remember (UNF.forward (UNF.Forward hints) P fuelf pp
       {| UNF.Vars := typeof_env vars
         ; UNF.UVars := typeof_env uvars
         ; UNF.Heap := s |}).
@@ -286,7 +287,7 @@ Section correctness.
     intuition. destruct SymMem; auto. apply AllProvable_app' in H2; apply AllProvable_app; intuition.
   Qed.
 
-  Definition sym_eval uvars path qs_env ss :=
+  Definition sym_eval bound uvars path qs_env ss :=
     let new_pures := 
       match SymMem ss with
         | None => SymPures ss
@@ -302,7 +303,7 @@ Section correctness.
                  end in
     let unfolder := match ILAlgoTypes.Hints algos with
                       | None => @MEVAL.LearnHookDefault.LearnHook_default TYPES _
-                      | Some h => unfolder_LearnHook h 
+                      | Some h => unfolder_LearnHook h bound
                     end in
     let facts := Summarize prover new_pures in
     let uvars := uvars ++ gatherAll qs_env in
@@ -311,11 +312,11 @@ Section correctness.
     let (ss,qs) := unfolder prover uvars vars ss facts new_pures in
     @sym_evalStream _ prover meval unfolder facts path (appendQ qs qs_env) (uvars ++ gatherAll qs) (vars ++ gatherEx qs) ss.
 
-  Theorem Apply_sym_eval_with_eq : forall stn meta_env sound_or_safe st path,   
+  Theorem Apply_sym_eval_with_eq bound : forall stn meta_env sound_or_safe st path,   
     istreamD funcs meta_env nil path stn st sound_or_safe ->
     forall cs qs ss res,
       qstateD funcs preds meta_env nil cs (stn,st) qs ss ->
-      sym_eval (typeof_env meta_env) path qs ss = res ->
+      sym_eval bound (typeof_env meta_env) path qs ss = res ->
       match res with
         | Safe qs' ss' =>
           quantD nil meta_env qs' (fun vars_env meta_env =>
@@ -474,8 +475,8 @@ Section abstracted.
     (ss : SymState TYPES) : Prop :=
     Quantifier.quantD vars uvars qs (fun vars_env meta_env => nstateD meta_env vars_env cs stn_st ss).
 
-  Definition sym_eval_prop sound_or_safe cs meta_env stn path qs_env ss :=
-    match sym_eval algos (typeof_env meta_env) path qs_env ss  with
+  Definition sym_eval_prop bound sound_or_safe cs meta_env stn path qs_env ss :=
+    match sym_eval algos bound (typeof_env meta_env) path qs_env ss  with
       | Safe qs' ss' =>
         quantD nil meta_env qs' (fun vars_env meta_env =>
           match sound_or_safe with
@@ -505,7 +506,7 @@ Qed.
 
 Local Notation tvWord := (tvType 0).
 
-Definition sym_eval_prop_no_heap (types' : list type) (funcs' : functions (repr bedrock_types_r types'))
+Definition sym_eval_prop_no_heap bound (types' : list type) (funcs' : functions (repr bedrock_types_r types'))
   (preds : SEP.predicates (repr bedrock_types_r types'))
   (algos : ILAlgoTypes.AllAlgos (repr bedrock_types_r types'))
   (Regs : state -> regs)
@@ -517,7 +518,7 @@ Definition sym_eval_prop_no_heap (types' : list type) (funcs' : functions (repr 
   (meta_env : env (repr bedrock_types_r types')) (stn : settings)
   (path : istream (repr bedrock_types_r (repr bedrock_types_r types')))
   sp rp rv pures :=
-  match sym_eval algos (typeof_env meta_env) path QBase {| SymMem := None ; SymRegs := (sp, rp, rv) ; SymPures := pures |} with
+  match sym_eval algos bound (typeof_env meta_env) path QBase {| SymMem := None ; SymRegs := (sp, rp, rv) ; SymPures := pures |} with
     | Safe qs' ss' =>
       quantD nil meta_env qs'
       (fun vars_env meta_env0 : env (repr bedrock_types_r types') =>
@@ -539,7 +540,7 @@ Definition sym_eval_prop_no_heap (types' : list type) (funcs' : functions (repr 
 
 Opaque stateD nstateD.
 
-Theorem ApplySymEval_slice_no_heap : forall types (funcs' : functions (repr bedrock_types_r types)) 
+Theorem ApplySymEval_slice_no_heap bound : forall types (funcs' : functions (repr bedrock_types_r types)) 
   (preds : SEP.predicates (repr bedrock_types_r types))
   (algos : ILAlgoTypes.AllAlgos (repr bedrock_types_r types))
   (algos_correct : @ILAlgoTypes.AllAlgos_correct (repr bedrock_types_r types) (repr (bedrock_funcs_r _) funcs') preds algos)
@@ -550,7 +551,7 @@ Theorem ApplySymEval_slice_no_heap : forall types (funcs' : functions (repr bedr
     exprD (repr (bedrock_funcs_r _) funcs') meta_env nil rv tvWord = Some (Regs st Rv) ->
     exprD (repr (bedrock_funcs_r _) funcs') meta_env nil rp tvWord = Some (Regs st Rp) ->
     Expr.AllProvable (repr (bedrock_funcs_r _) funcs') meta_env nil pures ->
-    sym_eval_prop_no_heap (repr (let ts := (@repr type bedrock_types_r types) in
+    sym_eval_prop_no_heap bound (repr (let ts := (@repr type bedrock_types_r types) in
        @Build_Repr (signature ts)
          (@map (signature ts)
             (option (signature ts))
@@ -573,7 +574,7 @@ Proof.
   match goal with
     | |- match ?X with _ => _ end =>
       consider (X) ; intros;
-        generalize (@Apply_sym_eval_with_eq _ _ _ _ algos_correct _ _ sound_or_safe _ _ H _ _ _ _ H0 H1); auto
+        generalize (@Apply_sym_eval_with_eq _ _ _ _ algos_correct bound _ _ sound_or_safe _ _ H _ _ _ _ H0 H1); auto
   end.
   { intros. eapply quantD_impl; try eassumption.
     simpl; intros. destruct sound_or_safe; auto. rewrite nstateD_stateD. auto. }
@@ -582,7 +583,7 @@ Proof.
     rewrite nstateD_stateD. auto. }
 Qed.
 
-Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bedrock_types_r types'))
+Definition sym_eval_prop_heap bound (types' : list type) (funcs' : functions (repr bedrock_types_r types'))
   (preds : SEP.predicates (repr bedrock_types_r types'))
   (algos : ILAlgoTypes.AllAlgos (repr bedrock_types_r types'))
   (Regs : state -> regs)
@@ -596,7 +597,7 @@ Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bed
   sh sp rp rv pures :=
   let '(vars', hashed) := SH.hash sh in
   match 
-    sym_eval algos (typeof_env meta_env) path (QEx (rev vars') QBase) 
+    sym_eval algos bound (typeof_env meta_env) path (QEx (rev vars') QBase) 
        {| SymMem := Some hashed
         ; SymRegs := (sp, rp, rv)
         ; SymPures := pures
@@ -621,7 +622,7 @@ Definition sym_eval_prop_heap (types' : list type) (funcs' : functions (repr bed
           is' stn st' sound_or_safe)
   end.
 
-Theorem ApplySymEval_slice_heap : forall types (funcs' : functions (repr bedrock_types_r types)) 
+Theorem ApplySymEval_slice_heap bound : forall types (funcs' : functions (repr bedrock_types_r types)) 
   (preds : SEP.predicates (repr bedrock_types_r types))
   (algos : ILAlgoTypes.AllAlgos (repr bedrock_types_r types))
   (algos_correct : @ILAlgoTypes.AllAlgos_correct (repr bedrock_types_r types) (repr (bedrock_funcs_r _) funcs') preds algos)
@@ -633,7 +634,7 @@ Theorem ApplySymEval_slice_heap : forall types (funcs' : functions (repr bedrock
     exprD (repr (bedrock_funcs_r _) funcs') meta_env nil rp tvWord = Some (Regs st Rp) ->
     Expr.AllProvable (repr (bedrock_funcs_r _) funcs') meta_env nil pures ->
     interp cs (![SEP.sexprD (repr (bedrock_funcs_r _) funcs') preds meta_env nil sh] (stn, st)) ->
-    (sym_eval_prop_heap (repr (let ts := (@repr type bedrock_types_r types) in
+    (sym_eval_prop_heap bound (repr (let ts := (@repr type bedrock_types_r types) in
        @Build_Repr (signature ts)
          (@map (signature ts)
             (option (signature ts))
@@ -659,7 +660,7 @@ Proof.
   match goal with
     | |- match ?X with _ => _ end =>
       consider (X) ; intros;
-        generalize (@Apply_sym_eval_with_eq _ _ _ _ algos_correct _ _ sound_or_safe _ _ H _ _ _ _ H0 H1); auto
+        generalize (@Apply_sym_eval_with_eq _ _ _ _ algos_correct bound _ _ sound_or_safe _ _ H _ _ _ _ H0 H1); auto
   end.
   { intros. eapply quantD_impl; try eassumption.
     simpl; intros. destruct sound_or_safe; auto. rewrite nstateD_stateD. auto. }
@@ -669,147 +670,3 @@ Proof.
 Qed.
   
 
-(*
-  Lemma stateD_AllProvable_pures : forall meta_env vars stn_st ss cs,
-    stateD funcs preds meta_env vars cs stn_st ss ->
-    AllProvable funcs meta_env vars
-    match SymMem ss with
-      | Some m0 => SH.pures m0 ++ SymPures ss
-      | None => SymPures ss
-    end.
-  Proof.
-    Opaque repr.
-    clear. unfold stateD. destruct ss; simpl. destruct stn_st. destruct SymRegs. destruct p.
-    intuition. destruct SymMem; auto. apply AllProvable_app' in H2; apply AllProvable_app; intuition.
-  Qed.
-
-  Theorem Apply_sym_eval_with_eq : forall stn meta_env sound_or_safe st path,   
-    istreamD funcs meta_env nil path stn st sound_or_safe ->
-    forall cs qs ss res,
-      qstateD funcs preds meta_env nil cs (stn,st) qs ss ->
-      sym_eval (typeof_env meta_env) path qs ss = res ->
-      match res with
-        | Safe qs' ss' =>
-          quantD nil meta_env qs' (fun vars_env meta_env =>
-            match sound_or_safe with
-              | None => False
-              | Some (st') => stateD funcs preds meta_env vars_env cs (stn, st') ss'
-              end)
-        | SafeUntil qs' ss' is' =>
-          quantD nil meta_env qs' (fun vars_env meta_env =>
-            exists st' : state,
-              stateD funcs preds meta_env vars_env cs (stn, st') ss' /\
-              istreamD funcs meta_env vars_env is' stn st' sound_or_safe)
-      end.
-  Proof.
-    intros. unfold sym_eval in *.
-    assert (PC : ProverT_correct
-              match ILAlgoTypes.Prover algos with
-              | Some p => p
-              | None => ReflexivityProver.reflexivityProver
-              end (repr (bedrock_funcs_r types') funcs)).
-    { generalize (ILAlgoTypes.Acorrect_Prover algos_correct).
-      destruct (ILAlgoTypes.Prover algos); intros; auto.
-      apply ReflexivityProver.reflexivityProver_correct. }
-    generalize dependent (match ILAlgoTypes.Prover algos with
-                            | Some p => p
-                            | None => ReflexivityProver.reflexivityProver
-                          end).
-    assert (MC : SymILProofs.MEVAL.MemEvaluator_correct pcT stT
-      match ILAlgoTypes.MemEval algos with
-      | Some me => me
-      | None => MEVAL.Default.MemEvaluator_default (repr BedrockCoreEnv.core TYPES)
-      end (repr (bedrock_funcs_r types') funcs) preds tvWord tvWord
-      (IL_mem_satisfies (ts:=types')) (IL_ReadWord (ts:=types'))
-      (IL_WriteWord (ts:=types')) (IL_ReadByte (ts:=types')) (IL_WriteByte (ts:=types'))).
-    { generalize (ILAlgoTypes.Acorrect_MemEval algos_correct).
-      destruct (ILAlgoTypes.MemEval algos); auto; intros.
-      apply SymIL.MEVAL.Default.MemEvaluator_default_correct. }
-    generalize dependent (match ILAlgoTypes.MemEval algos with
-                            | Some me => me
-                            | None => MEVAL.Default.MemEvaluator_default (repr BedrockCoreEnv.core TYPES)
-                          end).
-    match goal with
-      | [ |- context [ ?X ] ] =>
-        match X with 
-          | match ILAlgoTypes.Hints _ with _ => _ end =>
-            assert (LC : SymILProofs.MEVAL.LearnHook_correct (types_ := TYPES) (tvType 0) (tvType 1) X
-              (stateD funcs preds) (repr (bedrock_funcs_r types') funcs) preds); [ | generalize dependent X ]
-        end
-    end.
-    { generalize (ILAlgoTypes.Acorrect_Hints algos_correct).     
-      destruct (ILAlgoTypes.Hints algos); auto; intros.
-      { apply (@unfolderLearnHook_correct types' h funcs preds H1). } 
-      { apply SymIL.MEVAL.LearnHookDefault.LearnHook_default_correct. } }
-    intros l LC m MC p ? PC.
-    match goal with 
-      | [ H : context [ l ?A ?B ?C ?D ?E ?F ] |- _ ] =>
-        consider (l A B C D E F); intros
-    end.
-    unfold qstateD in *. destruct res.
-    Opaque stateD.
-    { destruct (SymILProofs.SymIL_Correct.sym_evalStream_quant_append _ _ _ _ _ _ _ _ _ H2).
-      subst. rewrite <- appendQ_assoc. rewrite quantD_app. eapply quantD_impl; eauto; intros. clear H0.
-      simpl in *.
-      match goal with 
-        | [ H : context [ @Summarize _ ?A ?B ] |- _ ] => 
-          assert (AP : AllProvable funcs (meta_env ++ b) a B); [ eauto using stateD_AllProvable_pures |
-            assert (VF : Valid PC (meta_env ++ b) a (Summarize A B)); 
-              [ clear H; eauto using Summarize_correct | generalize dependent (Summarize A B); generalize dependent B ; intros ] ]
-      end.
-      eapply (@SymILProofs.MEVAL.hook_sound _ _ _ _ _ _ _ _ LC _ PC (meta_env ++ b) a cs (stn,st)) in H5; eauto.
-      2: etransitivity; [ | eapply H1 ]. 2: f_equal; eauto. 2: rewrite typeof_env_app; f_equal; auto.
-      rewrite quantD_app. eapply quantD_impl; eauto; intros. simpl in *.
-
-      eapply (@SymILProofs.SymIL_Correct.evalStream_correct_Safe TYPES funcs preds _ PC _ MC _ LC sound_or_safe cs
-        stn path f s QBase x s0 ((typeof_env meta_env ++ gatherAll qs) ++ gatherAll q) (gatherEx qs ++ gatherEx q) (appendQ q qs)
-        H2).
-      { repeat (progress simpl || rewrite typeof_env_app || rewrite app_nil_r); f_equal; auto. f_equal; auto. }
-      { repeat (progress simpl || rewrite typeof_env_app || rewrite app_nil_r); f_equal; auto. }
-      { apply SymILProofs.SymIL_Correct.istreamD_weaken with (B := b ++ b0) (D := a ++ a0) in H.
-        rewrite repr_idempotent. rewrite app_ass. apply H. }
-      { simpl. intuition. eapply Valid_weaken. eauto. } }
-    { destruct (SymILProofs.SymIL_Correct.sym_evalStream_quant_append _ _ _ _ _ _ _ _ _ H2).
-      subst. rewrite <- appendQ_assoc. rewrite quantD_app. eapply quantD_impl; eauto; intros. clear H0.
-      simpl in *.
-      match goal with 
-        | [ H : context [ @Summarize _ ?A ?B ] |- _ ] => 
-          assert (AP : AllProvable funcs (meta_env ++ b) a B); [ eauto using stateD_AllProvable_pures |
-            assert (VF : Valid PC (meta_env ++ b) a (Summarize A B)); 
-              [ clear H; eauto using Summarize_correct | generalize dependent (Summarize A B); generalize dependent B ; intros ] ]
-      end.
-      eapply (@SymILProofs.MEVAL.hook_sound _ _ _ _ _ _ _ _ LC _ PC (meta_env ++ b) a cs (stn,st)) in H5; eauto.
-      2: etransitivity; [ | eapply H1 ]. 2: f_equal; eauto. 2: rewrite typeof_env_app; f_equal; auto.
-      rewrite quantD_app. eapply quantD_impl; eauto; intros. simpl in *.
-
-      eapply (@SymILProofs.SymIL_Correct.evalStream_correct_SafeUntil TYPES funcs preds _ PC _ MC _ LC sound_or_safe cs
-        stn path f s QBase x s0); eauto.  (*((typeof_env meta_env ++ gatherAll qs) ++ gatherAll q) (gatherEx qs ++ gatherEx q) (appendQ q qs)
-        H2). *)
-      { repeat (progress simpl || rewrite typeof_env_app || rewrite app_nil_r); f_equal; auto. f_equal; auto. }
-      { repeat (progress simpl || rewrite typeof_env_app || rewrite app_nil_r); f_equal; auto. }
-      { apply SymILProofs.SymIL_Correct.istreamD_weaken with (B := b ++ b0) (D := a ++ a0) in H.
-        rewrite repr_idempotent. rewrite app_ass. apply H. }
-      { simpl. intuition. eapply Valid_weaken. eauto. } }
-  Qed.
-
-  Theorem Apply_sym_eval : forall stn meta_env sound_or_safe st path,
-    istreamD funcs meta_env nil path stn st sound_or_safe ->
-    forall cs qs ss,
-      qstateD funcs preds meta_env nil cs (stn,st) qs ss ->
-      match sym_eval (typeof_env meta_env) path qs ss with
-        | Safe qs' ss' =>
-          quantD nil meta_env qs' (fun vars_env meta_env =>
-            match sound_or_safe with
-              | None => False
-              | Some (st') => stateD funcs preds meta_env vars_env cs (stn, st') ss'
-              end)
-        | SafeUntil qs' ss' is' =>
-          quantD nil meta_env qs' (fun vars_env meta_env =>
-            exists st' : state,
-              stateD funcs preds meta_env vars_env cs (stn, st') ss' /\
-              istreamD funcs meta_env vars_env is' stn st' sound_or_safe)
-      end.
-  Proof. intros. eapply Apply_sym_eval_with_eq; eauto. Qed.
-
-End apply_stream_correctness.
-*)

@@ -138,13 +138,15 @@ Ltac evaluate ext :=
   repeat match goal with
            | [ H : ?P -> False |- _ ] => change (not P) in H
          end;
-  ILTac.sym_eval ltac:(ILTacCommon.isConst) ext;
+  ILTac.sym_eval 10 ltac:(ILTacCommon.isConst) ext;
   clear_junk.
 
-Ltac cancel ext := 
-  sep_canceler ltac:(ILTacCommon.isConst) ext;
+Ltac cancel' bf bb ext := 
+  sep_canceler bf bb ltac:(ILTacCommon.isConst) ext;
   sep_firstorder;
   clear_junk.
+
+Ltac cancel ext := cancel' 10 10 ext.
 
 Ltac unf := unfold substH.
 Ltac reduce := Programming.reduce unf.
@@ -517,7 +519,8 @@ Ltac sep ext :=
     | _ => sep' ext
   end.
 
-Ltac sepLemma := unfold Himp in *; simpl; intros; cancel auto_ext.
+Ltac sepLemma_hints ext := unfold Himp in *; simpl; intros; cancel ext.
+Ltac sepLemma := sepLemma_hints auto_ext.
 
 Ltac sepLemmaLhsOnly :=
   let sllo Q := remember Q;
