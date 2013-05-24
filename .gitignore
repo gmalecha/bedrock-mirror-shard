@@ -1,0 +1,13 @@
+*.vo
+*.v.d
+*.glob
+*.cmo
+*.cmi
+*.cmx
+Makefile.coq
+coq-ext-lib
+mirror-shard
+src/ILTac.v
+*.cmxs
+*.ml4.d
+*.o
