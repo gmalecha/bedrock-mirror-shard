@@ -24,10 +24,10 @@ Section mem_ops.
     (m : mem) : option mem :=
     let '(a,b,c,d) := footprint_w p in
     let '(av,bv,cv,dv) := explode v in
-    match mem_set m d dv with
-      | Some m => match mem_set m c cv with
-                    | Some m => match mem_set m b bv with
-                                  | Some m => mem_set m a av
+    match mem_set m a av with
+      | Some m => match mem_set m b bv with
+                    | Some m => match mem_set m c cv with
+                                  | Some m => mem_set m d dv
                                   | None => None
                                 end
                     | None => None

@@ -597,41 +597,6 @@ Section spec_functions.
                | [ H : _ /\ _ |- _ ] => destruct H
              end.
 
-(*
-    (** TODO: find a better place for these! **)
-    Lemma mem_set_relevant_memoryIn : forall m p v m',
-      H.mem_set m p v = Some m' ->
-      relevant (memoryIn m) = relevant (memoryIn m').
-    Proof.
-      clear. do 5 intro. unfold relevant, memoryIn, HT.memoryIn. generalize H.all_addr.
-      induction l; simpl; auto; intros.
-      unfold H.mem_set, WriteByte, H.mem_get, ReadByte in *.
-      destruct (equiv_dec a p); unfold equiv in *; subst.
-      destruct (m p); try congruence. inversion H; simpl in *. destruct (weq p p); try congruence.
-
-      destruct (m p); try congruence. inversion H. subst.
-      destruct (weq a p). subst; congruence.
-      rewrite IHl. reflexivity.
-    Qed.
-
-
-    Lemma mem_set_word_relevant_memoryIn : forall (p v : Memory.W) x1 m p0,
-      Memory.mem_set_word H.addr H.mem H.footprint_w H.mem_set p0 p v m =
-      Some x1 -> relevant (memoryIn x1) = relevant (memoryIn m).
-    Proof.
-      clear.
-      unfold Memory.mem_set_word; do 2 intro. destruct (H.footprint_w p).
-      destruct p1. destruct p1. do 2 destruct p0. destruct p1. 
-      repeat match goal with
-               | [ |- match ?X with _ => _ end = _ -> _ ] => case_eq X; try congruence; intro; intro
-               | [ |- _ -> _ ] => intros
-               | [ H : H.mem_set _ _ _ = Some _ |- _ ] =>
-                 eapply mem_set_relevant_memoryIn in H
-             end.
-      congruence.
-    Qed.
-*)
-
     Lemma mep_correct : @MEVAL.PredEval.MemEvalPred_correct types pcT stT (IL.settings * IL.state)
       (tvType 0) (tvType 0) IL_mem_satisfies IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte mep pred funcs.
     Proof.
@@ -652,10 +617,27 @@ Section spec_functions.
 
         revert H; consider (exprD funcs uvars vars ve tvWord); intros; auto.
         unfold IL_ReadWord, ReadWord. simpl.
-        admit. (*
-        eapply satisfies_get_word; eauto.
-        eapply split_smem_get_word; eauto. *) }
-
+        Theorem smem_get_word_sound :
+          forall (s : smem) (m : BedrockHeap.mem),
+            models s m ->
+            forall (p : M.addr) v stn,
+              smem_read_word stn p s = Some v ->
+              Memory.mem_get_word _ _ footprint_w ReadByte (implode stn) p m = Some v.
+        Proof.
+          clear.
+          unfold smem_read_word, multi_read, Memory.mem_get_word, multi_read_addrs.
+          Opaque natToWord. 
+          simpl in *; intros.
+          change (ReadByte) with M.mem_get.
+          repeat match goal with
+                   | _ : match ?X with _ => _ end = Some _ |- _ =>
+                     consider X; intros; try congruence
+                   | |- _ =>
+                     erewrite smem_get_sound by eauto
+                 end. auto.
+        Qed.
+        eapply smem_get_word_sound. eassumption.
+        eapply MSMF.split_multi_read. eassumption. eapply H7. }
       { eapply interp_satisfies in H4. think.
         apply STK.interp_star in H5. think.
         eapply write_pred_correct in H; eauto.
@@ -669,21 +651,154 @@ Section spec_functions.
           | [ |- match ?X with _ => _ end -> match ?Y with _ => _ end ] =>
             change X with Y; consider Y; intros; auto
         end.
-        revert H8. (*consider (smem_set_word (explode stn) p v x); try contradiction; intros.
+        consider (smem_write_word stn p v x); try contradiction; intros.
         unfold IL_WriteWord, WriteWord in *.
-        unfold split in *. intuition.
-        eapply split_set_word in H8; eauto. think.
         generalize H8.
-        eapply satisfies_set_word in H8; eauto. think. 
-        simpl in *. rewrite H8. unfold IL_mem_satisfies.
-        generalize satisfies_star. unfold ST.satisfies. rewrite sepFormula_eq. unfold sepFormula_def; simpl.
-        intros. eapply H13; clear H13. exists s. exists x0. intuition.
-        unfold split. intuition.
-        eapply relevant_eq; eauto. 2: apply satisfies_memoryIn.
-        eapply smem_set_word_relevant in H14. rewrite <- H14. rewrite <- H11.
-          
-        eapply mem_set_word_relevant_memoryIn; eauto.
-        rewrite <- H11; apply satisfies_memoryIn. *) admit. }
+        eapply MSMF.split_multi_write in H8; eauto. think.
+        Theorem smem_set_word_sound :
+          forall (s : smem) (m : BedrockHeap.mem),
+            models s m ->
+            forall (p : M.addr) v stn s',
+              smem_write_word stn p v s = Some s' ->
+              exists m',
+                models s' m' /\
+                Memory.mem_set_word _ _ footprint_w WriteByte (explode stn) p v m = Some m'.
+        Proof.
+          clear.
+          unfold smem_write_word, multi_write, Memory.mem_set_word, multi_write_addrs.
+          simpl in *; intros.
+          change (WriteByte) with M.mem_set.
+          destruct (explode stn v) as [ [ [ ] ] ]; simpl in *.
+          repeat match goal with
+                   | _ : match ?X with _ => _ end = Some _ |- _ =>
+                     consider X; intros; try congruence
+                   | H : models _ _ , H' : _ |- _ =>
+                     eapply smem_set_sound in H'; [ clear H; intuition | exact H ]
+                   | H : exists x, _ |- _ => destruct H
+                   | H : _ /\ _ |- _ => destruct H
+                   | H : _ |- _ => rewrite H
+                 end.
+          inversion H4; clear H4; subst. eauto.
+        Qed.
+        eapply smem_set_word_sound in H10. 2: eassumption.
+        destruct H10. destruct H10. rewrite H11.
+        intros.
+        red. unfold star. eapply interp_satisfies.
+        simpl. split.
+        eapply memoryIn_sound.
+        unfold STK.istar.
+        eapply Exists_I with (B := s).
+        eapply Exists_I with (B := x0).
+        eapply And_I.
+        2: eapply And_I; eauto.
+        eapply Inj_I.
+        clear - H5 H8 H10 H4 H11 H12.
+        Lemma same_domain_models : forall x y z,
+                              models x z ->
+                              models y z ->
+                              (forall p, in_domain p x <-> in_domain p y) ->
+                              x = y.
+        Proof.
+          clear. unfold models, smem, in_domain, smem_get.
+          generalize BedrockHeap.NoDup_all_addr.
+          induction BedrockHeap.all_addr; simpl; intros.
+          { Require Import ExtLib.Data.HList.
+            rewrite (hlist_eta x) in *.
+            rewrite (hlist_eta y) in *. reflexivity. }
+          { rewrite (hlist_eta x) in *.
+            rewrite (hlist_eta y) in *.
+            simpl in *; f_equal.
+            destruct (hlist_hd x); destruct (hlist_hd y); intuition.
+            { rewrite H3 in *. auto. }
+            { specialize (H2 a). destruct (M.addr_dec a a); try congruence. 
+              destruct H2. exfalso. eapply H1; congruence. }
+            { specialize (H2 a). destruct (M.addr_dec a a); try congruence. 
+              destruct H2. exfalso. eapply H2; congruence. }
+            intuition. eapply IHl; eauto.
+            inversion H; auto.
+            intro. specialize (H2 p). destruct (M.addr_dec a p); auto.
+            subst. inversion H; clear H; subst.
+            Lemma smem_get'_not_in : forall l p, ~In p l ->
+                                                 forall x, smem_get' l p x = None.
+            Proof.
+              clear. induction l; simpl in *; intros; auto.
+              destruct (M.addr_dec a p). subst; intuition. eauto.
+            Qed.
+            split; intros. 
+            eapply H. eapply smem_get'_not_in. eauto. 
+            eapply H. eapply smem_get'_not_in. eauto. }
+        Qed.
+        cutrewrite (memoryIn x2 = x1); auto.
+        eapply same_domain_models; eauto.
+        eapply memoryIn_sound.
+        change (same_domain (memoryIn x2) x1).
+        symmetry.
+        Lemma memoryIn_mem_set : forall p v st x2,
+          WriteByte st p v = Some x2 ->
+          same_domain (memoryIn x2) (memoryIn st).
+        Proof.
+          clear. unfold same_domain, in_domain.
+          Theorem smem_get_memoryIn_not : forall p m, ~In p BedrockHeap.all_addr -> 
+                                                  smem_get p (memoryIn m) = None.
+          Proof.
+            clear. unfold smem_get, memoryIn, SM.memoryIn. 
+            induction BedrockHeap.all_addr; simpl; auto.
+            intros. destruct (M.addr_dec a p); intuition.
+          Qed.
+          Theorem smem_get_memoryIn : forall p m, In p BedrockHeap.all_addr -> 
+                                                  (smem_get p (memoryIn m) = None <-> ReadByte m p = None).
+          Proof.
+            clear. unfold smem_get, memoryIn, SM.memoryIn. 
+            generalize BedrockHeap.NoDup_all_addr.
+            induction BedrockHeap.all_addr.
+            simpl. intuition.
+            intros.
+            destruct H0; subst.
+            { simpl. destruct (M.addr_dec p p); try congruence. intuition. }
+            { simpl. destruct (M.addr_dec a p). subst. exfalso; inversion H; auto.
+              inversion H; clear H; subst. auto. }
+          Qed.
+          intros. destruct (in_dec M.addr_dec p0 BedrockHeap.all_addr).
+          repeat rewrite smem_get_memoryIn; eauto.
+          unfold ReadByte, WriteByte in *. consider (st p); try congruence; intros.
+          inversion H0; clear H0; subst. destruct (weq p0 p); subst. intuition congruence. intuition.
+          repeat rewrite smem_get_memoryIn_not; eauto. intuition.
+        Qed.
+        Lemma memoryIn_mem_set_word : forall stn p v st x2,
+          Memory.mem_set_word Memory.W mem footprint_w WriteByte (explode stn) p v st = Some x2 ->
+          same_domain (memoryIn x2) (memoryIn st).
+        Proof.
+          clear. unfold Memory.mem_set_word, in_domain, smem_get, memoryIn, SM.memoryIn.
+          intros. destruct (footprint_w p) as [ [ [ ] ] ].
+          destruct (explode stn v) as [ [ [ ] ] ].
+          repeat match goal with
+                   | _ : match ?X with _ => _ end = _ |- _ =>
+                     consider X; try congruence; intros
+                 end.
+          eapply memoryIn_mem_set in H.
+          eapply memoryIn_mem_set in H0.
+          eapply memoryIn_mem_set in H1.
+          eapply memoryIn_mem_set in H2.
+          etransitivity. eapply H2. etransitivity. eapply H1. etransitivity. eapply H0. eapply H.
+        Qed.
+        intro.
+        rewrite split_in_domain by eassumption.
+        eapply memoryIn_mem_set_word in H11. unfold same_domain in H11.
+        rewrite H11.
+        symmetry. rewrite split_in_domain by eassumption.
+        Lemma smem_write_word_same_domain : forall stn p v x s,
+                                              smem_write_word stn p v x = Some s ->
+                                              same_domain x s.
+        Proof.
+          clear. unfold smem_write_word, multi_write; simpl; intros.
+          repeat match goal with
+                   | _ : match ?X with _ => _ end = _ |- _ =>
+                     consider X; try congruence; intros
+                 end.
+          do 4 (etransitivity; [ eapply smem_set_same_domain; eassumption | ]). inversion H3; clear H3; subst.
+          unfold same_domain. intuition.
+        Qed.
+        eapply smem_write_word_same_domain in H12. unfold same_domain in *. rewrite H12. intuition. }
 
       { eapply interp_satisfies in H3. think.
         apply STK.interp_star in H4. think.
@@ -699,10 +814,9 @@ Section spec_functions.
         injection H7; clear H7; intros; subst.
         unfold IL_ReadByte, ReadByte. simpl.
         eapply split_smem_get in H4; eauto.
-        (*
-        eapply satisfies_get in H4; eauto.
-        unfold H.mem_get, ReadByte in H4; rewrite H4.
-        reflexivity.*) admit. }
+
+        eapply smem_get_sound in H4. 2: eassumption.
+        unfold M.mem_get, ReadByte in *. rewrite H4. auto. }
 
       { eapply interp_satisfies in H4. think.
         apply STK.interp_star in H5. think.
@@ -718,115 +832,29 @@ Section spec_functions.
             change X with Y; consider Y; intros; auto
         end.
         revert H8. consider (smem_set p (WtoB v) x); try contradiction; intros.
-        unfold IL_WriteByte, WriteByte in *.
-(*
-        Lemma smem_set'_present : forall p v ls m m',
-          smem_set' ls p v m = Some m'
-          -> exists v', smem_get' ls p m = Some v'.
-          clear; induction ls; simpl; intuition.
-          discriminate.
-          destruct (H.addr_dec a p); subst; eauto.
-          destruct (DepList.hlist_hd m); eauto; discriminate.
-          specialize (IHls (DepList.hlist_tl m)).
-          destruct (smem_set' ls p v (DepList.hlist_tl m)); eauto; discriminate.
-        Qed.
-
-        Lemma smem_set_present : forall p v m m',
-          smem_set p v m = Some m'
-          -> exists v', smem_get p m = Some v'.
-          intros; eapply smem_set'_present; eauto.
-        Qed.
-
-
-        destruct (smem_set_present _ _ _ H8).
-        generalize H5; intro Ho; eapply split_smem_get in Ho; eauto.
-        eapply satisfies_get in Ho; eauto.
-        unfold H.mem_get, ReadByte in Ho; rewrite Ho.
-        hnf; rewrite sepFormula_eq; PropXTac.propxFo.
-        exists s; exists x0; intuition.
-        unfold split in *; intuition.
-
-        Lemma smem_set'_disjoint : forall p v ls m m' m'',
-          smem_set' ls p v m = Some m'
-          -> disjoint' ls m m''
-          -> disjoint' ls m' m''.
-          clear; induction ls; simpl; intuition.
-          destruct (H.addr_dec a p); subst.
-          rewrite H0 in H; discriminate.
-          specialize (IHls (DepList.hlist_tl m)).
-          destruct (smem_set' ls p v (DepList.hlist_tl m)); try discriminate.
-          injection H; clear H; intros; subst; auto.
-          destruct (H.addr_dec a p); subst.
-          rewrite H0 in H; discriminate.
-          specialize (IHls (DepList.hlist_tl m)).
-          destruct (smem_set' ls p v (DepList.hlist_tl m)); try discriminate.
-          injection H; clear H; intros; subst; auto.
-          destruct (H.addr_dec a p); subst.
-          destruct (DepList.hlist_hd m); try discriminate.
-          injection H; clear H; intros; subst; auto.
-          specialize (IHls (DepList.hlist_tl m)).
-          destruct (smem_set' ls p v (DepList.hlist_tl m)); try discriminate.
-          injection H; clear H; intros; subst; auto.
-        Qed.
-
-        Lemma smem_set_disjoint : forall p v m m' m'',
-          smem_set p v m = Some m'
-          -> disjoint m m''
-          -> disjoint m' m''.
-          intros; eapply smem_set'_disjoint; eauto.
-        Qed.
-
-        eauto using smem_set_disjoint.
-
-        Lemma parts : forall A (B : A -> Type) x ls (h1 h2 : B x) (t1 t2 : DepList.hlist B ls),
-          DepList.HCons h1 t1 = DepList.HCons h2 t2
-          -> h1 = h2 /\ t1 = t2.
-          clear; intros.
-          assert (DepList.hlist_hd (DepList.HCons h1 t1) = DepList.hlist_hd (DepList.HCons h2 t2)) by congruence.
-          assert (DepList.hlist_tl (DepList.HCons h1 t1) = DepList.hlist_tl (DepList.HCons h2 t2)) by congruence.
-          auto.
-        Qed.
-
-        Lemma memoryIn'_agree : forall ls m1 m2,
-          List.Forall (fun p => m1 p = m2 p) ls
-          -> memoryIn' m1 ls = memoryIn' m2 ls.
-          clear; induction 1; simpl; intuition.
-          f_equal; auto.
-        Qed.
-
-        Lemma memoryIn'_join : forall m p v ls, NoDup ls
-          -> forall m1 m2 m1',
-            memoryIn' m ls = join' ls m1 m2
-            -> smem_set' ls p v m1 = Some m1'
-            -> memoryIn' (fun p' => if weq p' p then Some v else m p') ls = join' ls m1' m2.
-          clear; induction 1; simpl; intuition.
-          apply parts in H1; destruct H1.
-          destruct (H.addr_dec x p); subst.
-          destruct (DepList.hlist_hd m1); try discriminate.
-          injection H2; clear H2; intros; subst.
-          simpl.
-          f_equal.
-          unfold H.mem_get, ReadByte; destruct (weq p p); tauto.
-          rewrite (@memoryIn'_agree _ _ m); auto.
-          apply Forall_forall; intros.
-          destruct (weq x p); subst; tauto.
-          specialize (IHNoDup (DepList.hlist_tl m1)).
-          destruct (smem_set' l p v (DepList.hlist_tl m1)); try discriminate.
-          rewrite (IHNoDup _ _ H3 eq_refl); clear IHNoDup.
-          injection H2; clear H2; intros; subst; simpl.
-          f_equal; auto.
-          unfold H.mem_get, ReadByte.
-          destruct (weq x p); intuition.
-        Qed.
-
-        Lemma memoryIn_join : forall m m1 m2 p v m1',
-          memoryIn m = join m1 m2
-          -> smem_set p v m1 = Some m1'
-          -> memoryIn (fun p' => if weq p' p then Some v else m p') = join m1' m2.
-          intros; eapply memoryIn'_join; eauto using H.NoDup_all_addr.
-        Qed.
-        
-        eauto using memoryIn_join.*) admit. }
+        unfold IL_WriteByte.
+        generalize H8.
+        eapply split_smem_set in H8; eauto. think.
+        eapply smem_set_sound in H10. 2: eassumption. think; intros.
+        replace (WriteByte (Mem st) p (WtoB v)) with (M.mem_set (Mem st) p (WtoB v)) by reflexivity. rewrite H11.
+        red.
+        red. unfold star. eapply interp_satisfies.
+        simpl. split.
+        eapply memoryIn_sound.
+        unfold STK.istar.
+        eapply Exists_I with (B := s).
+        eapply Exists_I with (B := x0).
+        eapply And_I.
+        2: eapply And_I; eauto.
+        eapply Inj_I.
+        cutrewrite (memoryIn x2 = x1); auto.
+        eapply same_domain_models; eauto.
+        eapply memoryIn_sound.
+        change (same_domain (memoryIn x2) x1).
+        etransitivity. 2: eapply H10.
+        eapply smem_set_same_domain in H13.
+        eapply memoryIn_mem_set in H11.
+        etransitivity. eassumption. red. intuition. }
     Qed.
 
     Variable predIndex : nat.

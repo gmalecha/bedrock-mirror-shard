@@ -311,37 +311,49 @@ Theorem ReadWriteEq : forall stn m m' k v,
   WriteWord stn m k v = Some m' ->
   ReadWord stn m' k = Some v.
 Proof.
-  unfold ReadWord, WriteWord, mem_get_word, mem_set_word, footprint_w, ReadByte, WriteByte. intros stn m m' k v.
+  unfold ReadWord, WriteWord, mem_get_word, mem_set_word, footprint_w. intros stn m m' k v.
   case_eq (explode stn v). destruct p. destruct p. intros.
+  Require Import ExtLib.Tactics.Consider.
   repeat match goal with
-           | [ H : match match ?X with
-                           | Some _ => _
-                           | None => _
-                         end
-                     with
-                     | Some _ => _
-                     | None => _
-                   end = _ |- _ ] =>
-             generalize dependent H; case_eq X; try congruence; intros
+           | _ : context [ match WriteByte ?A ?B ?C with _ => _ end ] |- _ =>
+             consider (WriteByte A B C); intros; try congruence
          end.
-  generalize dependent H3.
-  case_eq ((if weq k (k ^+ $ (1))
-      then Some b1
-      else
-       if weq k (k ^+ $ (2))
-       then Some b
-       else if weq k (k ^+ $ (3)) then Some b2 else m k)); try congruence.
-  intros.
+  unfold WriteByte in *.
+  repeat match goal with
+           | _ : match ?X with _ => _ end = _ |- _ =>
+             (consider X; intros; try congruence); []
+         end.
   Opaque natToWord.
-  inversion H4; clear H4.
-  generalize dependent H1; generalize dependent H6; generalize dependent H3; generalize dependent H2.
-
-  repeat rewrite (rewrite_weq (refl_equal _)) in *.
   repeat match goal with
-           | [ |- context [ weq ?X ?Y ] ] => 
-             let Z := fresh in destruct (weq X Y) as [ Z | ? ]; [ exfalso; generalize Z; W_neq | ]
+           | H : Some _ = Some _ |- _ => 
+             inversion H; clear H; subst
          end.
-  intros. rewrite <- H. rewrite implode_explode. reflexivity.
+  unfold ReadByte.
+  repeat match goal with
+           | |- _ => congruence
+           | H : Word.wplus ?A ?B = ?Y |- _ =>
+             match Y with
+               | Word.wplus _ _ => fail 1
+               | _ => 
+                 assert (Word.wplus A B = Word.wplus Y $(0));
+                   [ etransitivity; [ eapply H | symmetry; rewrite Word.wplus_comm; eapply Word.wplus_unit ] | clear H ]
+             end
+           | H : ?Y = Word.wplus ?A ?B |- _ =>
+             match Y with
+               | Word.wplus _ _ => fail 1
+               | _ => 
+                 assert (Word.wplus Y $(0) = Word.wplus A B);
+                   [ etransitivity; [ rewrite Word.wplus_comm; eapply Word.wplus_unit | eapply H ] | clear H ]
+             end
+           | H : Word.wplus ?X ?Y = Word.wplus ?X ?Z |- _ =>
+             solve [ do 2 rewrite (Word.wplus_comm X) in H;
+               apply wplus_cancel in H; inversion H ]
+(*           | _ : context [ weq ?X ?Y ] |- _ => 
+             destruct (weq X Y) *)
+           | |- context [ weq ?X ?Y ] =>
+             destruct (weq X Y)
+         end.
+  rewrite <- H. f_equal. rewrite implode_explode. reflexivity.
 Qed.
 
 Theorem ReadWriteNe : forall stn m m' k v k', 
@@ -349,38 +361,42 @@ Theorem ReadWriteNe : forall stn m m' k v k',
   WriteWord stn m k v = Some m' ->
   ReadWord stn m' k' = ReadWord stn m k'.
 Proof.
-  unfold ReadWord, WriteWord, mem_get_word, mem_set_word, footprint_w, ReadByte, WriteByte; intros.
+  unfold ReadWord, WriteWord, mem_get_word, mem_set_word, footprint_w; intros.
   revert H0.
   case_eq (explode stn v); intros. destruct p. destruct p.
+  repeat match goal with
+           | _ : context [ match WriteByte ?A ?B ?C with _ => _ end ] |- _ =>
+             consider (WriteByte A B C); intros; try congruence
+         end.
+  unfold WriteByte in *.
+  repeat match goal with
+           | _ : match ?X with _ => _ end = _ |- _ =>
+             (consider X; intros; try congruence); []
+         end.
+  repeat match goal with
+           | H : Some _ = Some _ |- _ => 
+             inversion H; clear H; subst
+         end.
+  unfold ReadByte.
   assert (k' = k' ^+ $(0)). W_eq.
   assert (k = k ^+ $(0)). W_eq.
-  repeat match goal with
-           | [ H : match match ?X with
-                           | Some _ => _
-                           | None => _
-                         end
-                     with
-                     | Some _ => _
-                     | None => _
-                   end = _ |- _ ] =>
-             generalize dependent H; case_eq X; try congruence; intros
-         end.
-  generalize dependent H6.
-  case_eq ((if weq k (k ^+ $ (1))
-      then Some b2
-      else
-       if weq k (k ^+ $ (2))
-       then Some b0
-       else if weq k (k ^+ $ (3)) then Some b else m k)); try congruence.
-  intro. intros. inversion H7; clear H7. 
-  revert H4; revert H5; revert H1; revert H9.
   repeat match goal with
     | [ |- context [ weq ?X ?Y ] ] => 
       let Z := fresh in destruct (weq X Y) as [ Z | ? ]; 
         [ exfalso ; (apply H in Z || (rewrite H2 in Z; apply H in Z) || (rewrite H3 in Z; apply H in Z) || (rewrite H2 in Z; rewrite H3 in Z; apply H in Z)); auto; omega |  ]  
   end.
+  repeat match goal with
+    | |- context [ weq ?X ?Y ] =>
+      let F := fresh in 
+      destruct (weq X Y) as [ F | _ ]; [ exfalso; repeat match type of F with
+                                                    | k = _ => rewrite H6 in F
+                                                    | k' = _ => rewrite H5 in F
+                                                    | _ = k => rewrite H6 in F
+                                                    | _ = k' => rewrite H5 in F
+                                                  end ; eapply H in H7; auto; omega| ]
+  end.
   reflexivity.
-Qed.  
+Qed.
 
 (* Machine states *)
 Record state := {

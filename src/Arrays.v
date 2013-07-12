@@ -310,10 +310,10 @@ Lemma ptsto32m'_implies : forall specs stn p ws offset m,
   interp specs (ptsto32m' _ p offset ws stn m --->
     [| arrayImplies (fun n => smem_read_word stn (p ^+ $(n)) m) ws offset |])%PropX.
 Proof.
-Admitted. (*
   induction ws; unfold ptsto32m', arrayImplies; fold ptsto32m'; fold arrayImplies; intuition.
   apply Imply_I; apply Inj_I; constructor.
   unfold starB, star; apply Imply_I.
+  unfold STK.istar.
   eapply Exists_E; [ apply Env; hnf; eauto | cbv beta; intro ].
   eapply Exists_E; [ apply Env; hnf; left; eauto | cbv beta; intro ].
   apply implies_inj_and.
@@ -321,17 +321,16 @@ Admitted. (*
   eapply Inj_E; [ eapply And_E1; apply Env; hnf; eauto | intro ].
   eapply Inj_E; [ eapply And_E1; eapply And_E2; apply Env; hnf; eauto | intro ].
   apply Inj_I.
-  eapply split_smem_get_word; eauto.
-  tauto.
+  eapply MSMF.split_multi_read. eassumption. destruct H0. eapply H0.
   eapply Inj_E; [ eapply And_E1; apply Env; hnf; eauto | intro ].
   eapply Imply_E; [ apply interp_weaken; apply inj_imply;
-    apply (arrayImplies_weaken (fun n => smem_get_word (implode stn) (p ^+ $ (n)) B0)) | ].
-  intros; eapply split_smem_get_word; eauto.
+    apply (arrayImplies_weaken (fun n => smem_read_word stn (p ^+ $ (n)) B0)) | ].
+  eapply split_comm in H.
+  intros; eapply MSMF.split_multi_read; eauto. 
   eapply Imply_E.
   eauto.
   eapply And_E2; eapply And_E2; apply Env; hnf; eauto.
 Qed.
-*)
 
 Theorem ptsto32m'_in : forall a vs offset,
   ptsto32m _ a offset vs ===> ptsto32m' _ a offset vs.
@@ -386,8 +385,7 @@ Lemma array_equals : forall specs stn st ws p fr ws' fr',
   -> interp specs (![array ws' p * fr'] (stn, st) --->
     [| length ws' = length ws -> ws' = ws |])%PropX.
 Proof.
-(*
-  rewrite sepFormula_eq; unfold sepFormula_def, starB, star; simpl; intros.
+  rewrite sepFormula_eq; unfold sepFormula_def, starB, star, STK.istar; simpl; intros.
   propxFo.
   eapply Imply_sound in H; [ | apply array_implies ].
   apply Inj_sound in H.
@@ -403,8 +401,7 @@ Proof.
   apply Inj_I; intro.
   eauto using arrayImplies_equal.
   eapply And_E1; eapply And_E2; apply Env; simpl; eauto.
-*)
-Admitted.
+Qed.
 
 Lemma imply_and : forall pc state (specs : codeSpec pc state) (P : Prop) Q R,
   (P -> interp specs (Q ---> R)%PropX)
@@ -420,13 +417,12 @@ Lemma smem_read_correctx'' : forall cs base stn ws offset i m,
   -> interp cs (ptsto32m' _ base (offset * 4) ws stn m
     ---> [| smem_read_word stn (base ^+ $((offset + i) * 4)) m = Some (selN ws i) |])%PropX.
 Proof.
-(*
   induction ws.
 
-  simpl length.
-  intros.
-  elimtype False.
-  nomega.
+  { simpl length.
+    intros.
+    elimtype False.
+    nomega. }
 
   simpl length.
   unfold ptsto32m'.
@@ -434,7 +430,7 @@ Proof.
   intros.
   destruct i; simpl selN.
   replace (offset + 0) with offset by omega.
-  unfold starB, star.
+  unfold starB, star, STK.istar.
   apply Imply_I.
   eapply Exists_E; [ apply Env; hnf; eauto | cbv beta; intro ].
   eapply Exists_E; [ apply Env; hnf; left; eauto | cbv beta; intro ].
@@ -442,10 +438,10 @@ Proof.
   eapply Inj_E; [ eapply And_E1; apply Env; hnf; eauto | intro ].
   eapply Inj_E; [ eapply And_E1; eapply And_E2; apply Env; hnf; eauto | intro ].
   apply Inj_I.
-  eapply split_smem_read_word; eauto.
+  eapply MSMF.split_multi_read; eauto.
   tauto.
 
-  unfold starB, star.
+  unfold starB, star, STK.istar.
   apply Imply_I.
   eapply Exists_E; [ apply Env; hnf; eauto | cbv beta; intro ].
   eapply Exists_E; [ apply Env; hnf; left; eauto | cbv beta; intro ].
@@ -460,57 +456,52 @@ Proof.
   apply interp_weaken; apply inj_imply.
   instantiate (1 := S offset).
   intros.
-  eapply split_smem_read_word; eauto.
-  hnf.
+  eapply split_comm in H0.
+  eapply MSMF.split_multi_read; eauto.
   do 2 eapply And_E2; apply Env; hnf; eauto.
-*)
-Admitted.
+Qed.
 
 Lemma array_boundx' : forall cs base stn ws m i,
   (0 < i < length ws)%nat
   -> base ^+ $(i * 4) = base
   -> interp cs (ptsto32m' _ base 0 ws stn m ---> [| False |])%PropX.
 Proof.
-(*
   destruct ws; simpl length; intros.
 
-  elimtype False; omega.
+  { elimtype False; omega. }
 
-  propxFo.
-  destruct i; try omega.
-  simpl in H1.
-  unfold starB, star.
-  apply Imply_I.
-  eapply Exists_E; [ apply Env; simpl; eauto | cbv beta; intro ].
-  eapply Exists_E; [ apply Env; simpl; left; eauto | cbv beta; intro ].
-  generalize (@smem_read_correctx'' cs base stn ws 1 i B0).
-  hnf.
-  change (1 + i) with (S i).
-  rewrite H0.
-  intro Hlem.
-  assert (i < length ws)%nat by omega; intuition.
-  eapply Inj_E.
-  unfold ptsto32.
-  eapply And_E1; eapply And_E2; apply Env; hnf; eauto.
-  rewrite wplus_comm.
-  rewrite wplus_unit.
-  intuition.
-  eapply Inj_E; [ eapply And_E1; apply Env; hnf; eauto | intro ].
-  eapply Inj_E.
-  eapply Imply_E.
-  eauto.
-  do 2 eapply And_E2; apply Env; hnf; eauto.
-  intro.
-  apply Inj_I.
-  destruct H4.
-  eapply smem_read_word_disjoint; eauto.
-*)
-Admitted.
+  { propxFo.
+    destruct i; try omega.
+    simpl in H1.
+    unfold starB, star, STK.istar.
+    apply Imply_I.
+    eapply Exists_E; [ apply Env; simpl; eauto | cbv beta; intro ].
+    eapply Exists_E; [ apply Env; simpl; left; eauto | cbv beta; intro ].
+    generalize (@smem_read_correctx'' cs base stn ws 1 i B0).
+    hnf.
+    change (1 + i) with (S i).
+    rewrite H0.
+    intro Hlem.
+    assert (i < length ws)%nat by omega; intuition.
+    eapply Inj_E.
+    unfold ptsto32.
+    eapply And_E1; eapply And_E2; apply Env; hnf; eauto.
+    rewrite wplus_comm.
+    rewrite wplus_unit.
+    intuition.
+    eapply Inj_E; [ eapply And_E1; apply Env; hnf; eauto | intro ].
+    eapply Inj_E.
+    eapply Imply_E.
+    eauto.
+    do 2 eapply And_E2; apply Env; hnf; eauto.
+    intro.
+    apply Inj_I.
+    eapply smem_read_word_disjoint; eauto. }
+Qed.
 
 Lemma array_boundx : forall cs ws base stn m,
   interp cs (array ws base stn m ---> [| length ws < pow2 32 |]%nat)%PropX.
 Proof.
-(*
   intros.
   destruct (lt_dec (length ws) (pow2 32)); auto.
   apply Imply_I; apply Inj_I; auto.
@@ -531,34 +522,31 @@ Proof.
   rewrite roundTrip_0.
   rewrite plus_0_r.
   apply natToWord_wordToNat.
-*)
-Admitted.
+Qed.
 
 Theorem containsArray_boundx' : forall cs P stn ls,
   containsArray P ls
   -> forall st, interp cs (P stn st ---> [|length ls < pow2 32|]%nat)%PropX.
 Proof.
-(*
   induction 1; intros.
-  eapply array_boundx; eauto.
+  { eapply array_boundx; eauto. }
 
-  unfold SEP.ST.star.
-  apply Imply_I.
-  eapply Exists_E; [ apply Env; simpl; eauto | cbv beta; intro ].
-  eapply Exists_E; [ apply Env; simpl; left; eauto | cbv beta; intro ].
-  eapply Imply_E; eauto.
-  eapply And_E1; eapply And_E2; apply Env; simpl; eauto.
+  { unfold star, STK.istar.
+    apply Imply_I.
+    eapply Exists_E; [ apply Env; simpl; eauto | cbv beta; intro ].
+    eapply Exists_E; [ apply Env; simpl; left; eauto | cbv beta; intro ].
+    eapply Imply_E; eauto.
+    eapply And_E1; eapply And_E2; apply Env; simpl; eauto. }
 
-  unfold SEP.ST.star.
-  apply Imply_I.
-  eapply Exists_E; [ apply Env; simpl; eauto | cbv beta; intro ].
-  eapply Exists_E; [ apply Env; simpl; left; eauto | cbv beta; intro ].
-  eapply Imply_E; eauto.
-  do 2 eapply And_E2; apply Env; simpl; eauto.
+  { unfold star, STK.istar.
+    apply Imply_I.
+    eapply Exists_E; [ apply Env; simpl; eauto | cbv beta; intro ].
+    eapply Exists_E; [ apply Env; simpl; left; eauto | cbv beta; intro ].
+    eapply Imply_E; eauto.
+    do 2 eapply And_E2; apply Env; simpl; eauto. }
 
-  rewrite upd_length in *; eauto.
-*)
-Admitted.
+  { rewrite upd_length in *; eauto. }
+Qed.
 
 Theorem containsArray_boundx : forall cs P stn ls st,
   containsArray P ls
