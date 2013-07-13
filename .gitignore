@@ -11,3 +11,4 @@ src/ILTac.v
 *.cmxs
 *.ml4.d
 *.o
+.dir-locals.el

@@ -1,4 +1,5 @@
 Require Import List Arith Bool.
+Require Import ExtLib.Tactics.Consider.
 Require Import MirrorShard.Expr MirrorShard.Env.
 Require Import MirrorShard.Prover.
 Require Import Word.
@@ -19,15 +20,15 @@ Section WordProver.
   Definition funcs := repr (bedrock_funcs_r _) funcs'.
 
   Record equality := {
-    Source : expr types;
-    Destination : expr types;
+    Source : expr;
+    Destination : expr;
     Difference : W
   }.
 
   Record word_summary := {
     Equalities : list equality;
-    LessThans : list (expr types * expr types);
-    NotEquals : list (expr types * expr types)
+    LessThans : list (expr * expr);
+    NotEquals : list (expr * expr)
   }.
 
   Require Import Div2.
@@ -63,14 +64,22 @@ Section WordProver.
     reflexivity.
   Qed.
 
-  Fixpoint decompose (e : expr types) : expr types * W :=
+  Fixpoint decompose (e : expr) : expr * W :=
     match e with
-      | Func 0%nat [e1, Func 5%nat (Const (tvType 4%nat) k :: nil)] =>
-        let (e1', d) := decompose e1 in
-          (e1', wplus' d (natToWord' _ k))
-      | Func 1%nat [e1, Func 5%nat (Const (tvType 4%nat) k :: nil)] =>
-        let (e1', d) := decompose e1 in
-          (e1', wminus' d (natToWord' _ k))
+      | Func 0%nat [e1, Func 5%nat (k :: nil)] =>
+        match toConst_nat k with 
+          | None => (e,zero)
+          | Some k =>
+            let (e1', d) := decompose e1 in
+            (e1', wplus' d (natToWord' _ k))
+        end
+      | Func 1%nat [e1, Func 5%nat (k :: nil)] =>
+        match toConst_nat k with
+            | None => (e, zero)
+            | Some k =>
+              let (e1', d) := decompose e1 in
+              (e1', wminus' d (natToWord' _ k))
+        end
       | _ => (e, zero)
     end.
 
@@ -104,7 +113,7 @@ Section WordProver.
       | f :: fs1' => merge fs1' (if alreadyCovered f fs2 then fs2 else (f :: fs2))
     end.
 
-  Definition wordLearn1 (sum : word_summary) (e : expr types) : word_summary :=
+  Definition wordLearn1 (sum : word_summary) (e : expr) : word_summary :=
     match e with
       | Equal (tvType 0) e1 e2 =>
         let (b1, n1) := decompose e1 in
@@ -131,14 +140,14 @@ Section WordProver.
       | _ => sum
     end.
 
-  Fixpoint wordLearn (sum : word_summary) (hyps : list (expr types)) : word_summary :=
+  Fixpoint wordLearn (sum : word_summary) (hyps : list (expr)) : word_summary :=
     match hyps with
       | nil => sum
       | h :: hyps' => wordLearn (wordLearn1 sum h) hyps'
     end.
 
   Definition equalitysEq (f1 f2 : equality) :=
-    expr_seq_dec (Source f1) (Source f2)
+       expr_seq_dec (Source f1) (Source f2)
     && expr_seq_dec (Destination f1) (Destination f2)
     && W_seq (Difference f1) (Difference f2).
 
@@ -148,7 +157,8 @@ Section WordProver.
       | f' :: fs' => equalitysEq f f' || equalityMatches f fs'
     end.
 
-  Fixpoint lessThanMatches (e1 e2 : expr types) (lts : list (expr types * expr types)) (eqs : list equality) : bool :=
+  Fixpoint lessThanMatches (e1 e2 : expr) (lts : list (expr * expr)) (eqs : list equality) 
+  : bool :=
     match lts with
       | nil => false
       | (e1', e2') :: lts' => ((expr_seq_dec e1 e1'
@@ -161,7 +171,7 @@ Section WordProver.
           Difference := zero |} eqs)) || lessThanMatches e1 e2 lts' eqs
     end.
 
-  Definition wordProve (sum : word_summary) (e : expr types) :=
+  Definition wordProve (sum : word_summary) (e : expr) :=
     match e with
       | Equal (tvType 0) e1 e2 =>
         let (b1, n1) := decompose e1 in
@@ -185,20 +195,23 @@ Section WordProver.
   Section vars.
     Variables uvars vars : env types.
 
-    Definition equalityValid (f : equality) := exists v1, exprD funcs uvars vars (Source f) (tvType 0%nat) = Some v1
+    Definition equalityValid (f : equality) := 
+         exists v1, exprD funcs uvars vars (Source f) (tvType 0%nat) = Some v1
       /\ exists v2, exprD funcs uvars vars (Destination f) (tvType 0%nat) = Some v2
-        /\ v2 = v1 ^+ Difference f.
+      /\ v2 = v1 ^+ Difference f.
 
-    Definition lessThanValid (p : expr types * expr types) := exists v1, exprD funcs uvars vars (fst p) (tvType 0%nat) = Some v1
+    Definition lessThanValid (p : expr * expr) := 
+         exists v1, exprD funcs uvars vars (fst p) (tvType 0%nat) = Some v1
       /\ exists v2, exprD funcs uvars vars (snd p) (tvType 0%nat) = Some v2
-        /\ v1 < v2.
+      /\ v1 < v2.
 
-    Definition notEqualValid (p : expr types * expr types) := exists v1, exprD funcs uvars vars (fst p) (tvType 0%nat) = Some v1
+    Definition notEqualValid (p : expr * expr) := 
+         exists v1, exprD funcs uvars vars (fst p) (tvType 0%nat) = Some v1
       /\ exists v2, exprD funcs uvars vars (snd p) (tvType 0%nat) = Some v2
-        /\ v1 <> v2.
+      /\ v1 <> v2.
 
     Definition wordValid (sum : word_summary) :=
-      Forall equalityValid sum.(Equalities)
+         Forall equalityValid sum.(Equalities)
       /\ Forall lessThanValid sum.(LessThans)
       /\ Forall notEqualValid sum.(NotEquals).
 
@@ -217,91 +230,89 @@ Section WordProver.
           /\ v = v' ^+ n.
     Proof.
       Opaque natToWord'.
-      induction e; simpl; intuition.
+      induction e; simpl; intuition; try congruence.
 
-      t; eauto.
+      solve [ t; eauto ].
 
-      eauto.
+      solve [ eauto ].
 
-      eauto.
+      { destruct f.
+        { destruct l; try discriminate.
+          destruct l; try discriminate.
+          eauto.
 
-      destruct f.
-      destruct l; try discriminate.
-      destruct l; try discriminate.
-      eauto.
+          destruct e0; eauto.
+          do 6 (destruct f; eauto).
+          do 2 (destruct l0; eauto).
+          destruct l; eauto.
 
-      destruct e0; eauto.
-      do 6(destruct f; eauto).
-      destruct l0; eauto.
-      destruct e0; eauto.
-      destruct t; eauto.
-      do 5(destruct n; eauto).
-      destruct l0; eauto.
-      destruct l; eauto.
-      simpl.
-      inversion H; clear H; subst.
-      inversion H3; clear H3; subst.
-      clear H4.
-      simpl in *.
-      specialize (H1 _ (refl_equal _)); destruct H1; intuition; subst.
-      clear H0.
-      destruct (decompose e).
-      intro.
-      match goal with
-        | [ |- context[match ?E with Some _ => _ | None => _ end] ] => destruct E
-      end.
-      specialize (H2 _ (refl_equal _)); destruct H2; intuition; subst.
-      injection H0; clear H0; intros; subst.
-      repeat esplit; eauto.
-      rewrite natToWord'_def.
-      rewrite wplus'_def.
-      repeat rewrite wplus_assoc; reflexivity.
-      discriminate.
-
-      destruct f.
-      destruct l; try discriminate.
-      destruct l; try discriminate.
-      eauto.
-
-      destruct e0; eauto.
-      do 6 (destruct f; eauto).
-      destruct l0; eauto.
-      destruct e0; eauto.
-      destruct t; eauto.
-      do 5 (destruct n; eauto).
-      destruct l0; eauto.
-      destruct l; eauto.
-      simpl.
-      inversion H; clear H; subst.
-      inversion H3; clear H3; subst.
-      clear H4.
-      simpl in *.
-      specialize (H1 _ (refl_equal _)); destruct H1; intuition; subst.
-      clear H0.
-      destruct (decompose e).
-      intro.
-      match goal with
-        | [ |- context[match ?E with Some _ => _ | None => _ end] ] => destruct E
-      end.
-      specialize (H2 _ (refl_equal _)); destruct H2; intuition; subst.
-      injection H0; clear H0; intros; subst.
-      repeat esplit; eauto.
-      rewrite wminus'_def.
-      repeat rewrite wplus_assoc.
-      repeat rewrite wminus_def.
-      repeat rewrite wplus_assoc.
-      reflexivity.
-      discriminate.
-      eauto.
-
-      discriminate.
-      discriminate.
+          consider (toConst_nat e0); intros; eauto.
+          simpl.
+          inversion H; clear H; subst.
+          consider (decompose e); intros.
+          match goal with
+            | _ : match ?X with _ => _ end _ _ = _ , _ : forall v, ?Y = _ -> _ |- _ =>
+              change Y with X in *
+          end.
+          repeat match goal with
+                   | _ : match ?X with _ => _ end _ _ = _ |- _ =>
+                     (consider X; try congruence; intros); [ ]
+                   | H : Some _ = Some _ |- _ =>
+                     inversion H; clear H; subst
+                 end.
+          specialize (H3 _ (eq_refl _)).
+          do 2 destruct H3. 
+          eexists. split. eapply H3.
+          eapply toConst_nat_sound with (ts' := types) (fs' := funcs) (us := uvars) (vs := vars) in H0.
+          cut (t0 = n); intros.
+          { rewrite H5 in *. rewrite H6 in *.
+            rewrite natToWord'_def.
+            rewrite wplus'_def.
+            repeat rewrite wplus_assoc; reflexivity. }
+          { clear - H0 H2.
+            cut (Some n = Some t0).
+            inversion 1; auto.
+            rewrite <- H0. eapply H2. } }
+        { destruct f; eauto.
+          do 2 (destruct l; eauto).
+          destruct e0; eauto.
+          do 6 (destruct f; eauto).
+          do 2 (destruct l0; eauto).
+          destruct l; eauto.
+          consider (toConst_nat e0); eauto; intros.
+          inversion H; clear H; subst.
+          clear H4.
+          destruct (decompose e); intros.
+          simpl in *.
+          match goal with
+            | _ : match ?X with _ => _ end _ _ = _ , _ : forall v, ?Y = _ -> _ |- _ =>
+              change Y with X in *
+          end.
+          repeat match goal with
+                   | _ : match ?X with _ => _ end _ _ = _ |- _ =>
+                     (consider X; try congruence; intros); [ ]
+                   | H : Some _ = Some _ |- _ =>
+                     inversion H; clear H; subst
+                 end.
+          specialize (H3 _ (eq_refl _)).
+          destruct H3; intuition.
+          subst.
+          eapply toConst_nat_sound with (ts' := types) (fs' := funcs) (us := uvars) (vs := vars) in H0.
+          eexists; split. eassumption.
+          cutrewrite (n = t0).
+          rewrite natToWord'_def.
+          rewrite wminus'_def.
+          repeat rewrite wminus_def.
+          repeat rewrite wplus_assoc; reflexivity.
+          cut (Some n = Some t0); try congruence. 
+          rewrite <- H0. eassumption. } }
     Qed.
 
     Lemma mergeCorrect : forall fs1,
       Forall equalityValid fs1
       -> forall fs2, Forall equalityValid fs2
         -> Forall equalityValid (merge fs1 fs2).
+    Proof.
       induction 1; simpl; intuition.
       destruct (alreadyCovered x fs2); auto.
     Qed.
@@ -670,79 +681,64 @@ Section WordProver.
   Theorem wordProverCorrect : ProverCorrect funcs wordValid wordProve.
   Proof.
     hnf; intros.
-    destruct H.
+    destruct H. destruct H2.
     destruct goal; simpl in *; try discriminate.
 
-    do 5 (destruct f; try discriminate).
-    do 3 (destruct l; try discriminate).
-    apply (@lessThanMatches_correct uvars vars) in H0; auto.
-    destruct H0; intuition.
-    destruct H5; intuition.
-    hnf.
-    simpl in *.
-    rewrite H2.
-    rewrite H5.
-    assumption.
-    tauto.
-
-    destruct t; try discriminate.
-    destruct n; try discriminate.
-    specialize (decompose_correct uvars vars goal1); intro Hy1.
-    specialize (decompose_correct uvars vars goal2); intro Hy2.
-    destruct (decompose goal1); destruct (decompose goal2).
-    simpl in *.
-
-    hnf in H1; simpl in H1.
-    destruct H1.
-    case_eq (exprD funcs uvars vars goal1 (tvType 0)); simpl; intros.
-    rewrite H3 in *.
-    case_eq (exprD funcs uvars vars goal2 (tvType 0)); simpl; intros.
-    rewrite H4 in *.
-    injection H1; clear H1; intros; subst.
-    specialize (Hy1 _ (refl_equal _)); destruct Hy1.
-    specialize (Hy2 _ (refl_equal _)); destruct Hy2.
-    intuition; subst.
-    hnf; simpl.
-    rewrite H3.
-    rewrite H4.
-
-    generalize (expr_seq_dec_correct e e0).
-    destruct (expr_seq_dec e e0); intuition; subst.
-
-    apply (Expr.Eqb_correct bedrock_type_W) in H0.
-    congruence.
-
-    clear H5.
-    eapply equalityMatches_correct in H0; eauto.
-    destruct H0; simpl in *; intuition.
-    destruct H8; intuition.
-    subst.
-    rewrite H5 in H2; injection H2; clear H2; intros; subst.
-    rewrite H8 in H1; injection H1; clear H1; intros; subst.
-    rewrite wminus'_def.
-    rewrite wminus_def.
-    repeat rewrite <- wplus_assoc.
-    rewrite (wplus_comm (^~ w0) w0).
-    rewrite wminus_inv.
-    rewrite (wplus_comm w (wzero 32)).
-    rewrite wplus_unit.
-    reflexivity.
-
-    rewrite H4 in *; discriminate.
-    rewrite H3 in *; discriminate.
-
-    destruct goal; try discriminate.
-    destruct t; try discriminate.
-    destruct n; try discriminate.
-    apply (@lessThanMatches_notEqual_correct uvars vars) in H0; auto.
-    destruct H0; intuition.
-    destruct H5; intuition.
-    hnf.
-    simpl in *.
-    rewrite H2.
-    rewrite H5.
-    assumption.
-    tauto.
+    { do 5 (destruct f; try discriminate).
+      do 3 (destruct l; try discriminate).
+      apply (@lessThanMatches_correct uvars vars) in H0; auto.
+      destruct H0; intuition.
+      destruct H5; intuition.
+      hnf.
+      simpl in *.
+      repeat match goal with
+               | H : @exprD ?A ?B ?C ?D ?e ?F = _ |- context [ @exprD ?G ?H ?I ?J ?e ?K ] =>
+                 change (@exprD G H I J e K) with (@exprD A B C D e F) ; 
+                   rewrite H
+             end.
+      rewrite H4. rewrite H5. auto. }
+    { destruct t; try discriminate.
+      destruct n; try discriminate.
+      specialize (decompose_correct uvars vars goal1); intro Hy1.
+      specialize (decompose_correct uvars vars goal2); intro Hy2.
+      destruct (decompose goal1); destruct (decompose goal2).
+      destruct H1. simpl in H1.
+      repeat match goal with
+                 | _ : match ?X with _ => _ end = _ , H : forall x, ?Y = _ -> _ |- _ =>
+                   (change Y with X in H; consider X; intros; try congruence); []
+                 | H : _ |- _ => specialize (H _ eq_refl)
+                 | H : exists x, _ |- _ => destruct H
+                 | H : _ /\ _ |- _ => destruct H
+               end.
+      consider (expr_seq_dec e e0); intros; subst.
+      { eapply W_seq_compare in H10; subst.
+        red; simpl.
+        rewrite H1. rewrite H4.
+        rewrite H6 in H7. inversion H7; clear H7; subst.
+        reflexivity. }
+      { eapply equalityMatches_correct in H0; eauto.
+        destruct H0; simpl in *; intuition.
+        destruct H9; intuition.
+        red. simpl. rewrite H4. rewrite H1.
+        rewrite H7 in H8. inversion H8; clear H8; subst.
+        rewrite H6 in H9. inversion H9; clear H9; subst.
+        rewrite wminus'_def.
+        rewrite wminus_def.
+        repeat rewrite <- wplus_assoc.
+        rewrite (wplus_comm (^~ w0) w0).
+        rewrite wminus_inv.
+        rewrite (wplus_comm w (wzero 32)).
+        rewrite wplus_unit.
+        reflexivity. } }
+    { destruct goal; try discriminate.
+      destruct t; try discriminate.
+      destruct n; try discriminate.
+      apply (@lessThanMatches_notEqual_correct uvars vars) in H0; auto.
+      destruct H0; intuition.
+      destruct H5; intuition.
+      hnf.
+      simpl in *.
+      rewrite H4. rewrite H5. tauto. }
   Qed.
 
   Lemma wordValid_weaken : forall (u g : env types) (f : word_summary)

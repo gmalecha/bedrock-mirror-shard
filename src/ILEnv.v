@@ -143,6 +143,20 @@ Section typed_ext.
     exact (@wmult 32).
   Defined.
 
+  Definition nat_types_r : Repr Expr.type :=
+    Eval cbv beta iota zeta delta [ listToRepr ] 
+      in (listOptToRepr (None :: None :: None :: None :: Some bedrock_type_nat :: nil) Expr.EmptySet_type).
+
+  Definition O_r : signature (repr nat_types_r types').
+    refine {| Domain := nil; Range := natT |}.
+    exact 0.
+  Defined.
+
+  Definition S_r : signature (repr nat_types_r types').
+    refine {| Domain := natT :: nil; Range := natT |}.
+    exact S.
+  Defined.
+
 (*
   Definition word_test_r : Repr Expr.type :=
     Eval cbv beta iota zeta delta [ listToRepr ] 
@@ -186,11 +200,82 @@ End typed_ext.
     (* wcomparator_r types :: *)
     Regs_r types ::
     wlt_r types ::
-    natToW_r types :: nil.
+    natToW_r types :: 
+    O_r types ::
+    S_r types ::
+    nil.
 
   Definition bedrock_funcs_r types' : Repr (signature (repr bedrock_types_r types')) :=
     Eval cbv beta iota zeta delta [ listToRepr bedrock_funcs ]
       in (listToRepr (bedrock_funcs types') (Default_signature _)).
+
+  Definition nat_funcs types' : list (option (signature (repr nat_types_r types'))) :=
+    let types := repr nat_types_r types' in
+    None ::
+    None ::
+    None ::
+    None ::
+    None ::
+    None ::
+    Some (O_r types) ::
+    Some (S_r types) ::
+    nil.
+
+  Definition nat_funcs_r types' : Repr (signature (repr nat_types_r types')) :=
+    Eval cbv beta iota zeta delta [ listOptToRepr nat_funcs ]
+      in (listOptToRepr (nat_funcs types') (Default_signature _)).
+
+Section nat_const.
+  Variable ts' : list type.
+  Let ts := repr nat_types_r ts'.
+  Variable fs' : functions ts.
+  Let fs := repr (nat_funcs_r ts') fs'.
+
+  Fixpoint toConst_nat (e : expr) : option nat :=
+    match e with
+      | Func 6 nil => Some 0
+      | Func 7 (e :: nil) =>
+        match toConst_nat e with
+          | Some n => Some (S n)
+          | None => None
+        end
+      | _ => None
+    end.
+  
+  Theorem toConst_nat_sound : forall e n,
+                                toConst_nat e = Some n ->
+                                forall us vs,
+                                  exprD fs us vs e (tvType 4) = Some n.
+  Proof.
+    induction e; simpl; intros; try discriminate.
+    do 7 (destruct f; try discriminate).
+    { destruct l; try congruence. 
+      inversion H0; clear H0; subst.
+      simpl. reflexivity. }
+    { destruct f; try discriminate.
+      do 2 (destruct l; try discriminate).
+      inversion H; clear H; subst.
+      destruct (toConst_nat e); try discriminate.
+      specialize (H3 _ eq_refl).
+      simpl.
+      rewrite H3. auto. }
+  Qed.
+
+  Fixpoint toExpr_nat (n : nat) : expr :=
+    match n with
+      | 0 => Func 6 nil
+      | S n => Func 7 (toExpr_nat n :: nil)
+    end.
+
+  Theorem toExpr_nat_sound : forall n us vs,
+                               exprD fs us vs (toExpr_nat n) (tvType 4) = Some n.
+  Proof.
+    induction n; simpl; intros; eauto.
+    rewrite IHn. reflexivity.
+  Qed.
+
+End nat_const.
+
   
 Section func_ext.
   Local Notation "'pcT'" := (tvType 0).
@@ -208,11 +293,11 @@ Section func_ext.
   Variable funcs' : functions types.
   Definition funcs := repr (bedrock_funcs_r types') funcs'.
   
-  Definition fPlus (l r : expr types) : expr types :=
+  Definition fPlus (l r : expr) : expr :=
     Expr.Func 0 (l :: r :: nil).
-  Definition fMinus (l r : expr types) : expr types :=
+  Definition fMinus (l r : expr) : expr :=
     Expr.Func 1 (l :: r :: nil).
-  Definition fMult (l r : expr types) : expr types :=
+  Definition fMult (l r : expr) : expr :=
     Expr.Func 2 (l :: r :: nil).
 
   Theorem fPlus_correct : forall l r uvars vars, 

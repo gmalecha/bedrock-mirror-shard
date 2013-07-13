@@ -19,6 +19,21 @@ Set Strict Implicit.
 
 (** Blacklist **)
 (***************)
+Print Evm_compute.
+Fixpoint app_bl (l1 l2 : Evm_compute.Blacklist) : Evm_compute.Blacklist :=
+  match l1 with
+    | Evm_compute.Bnil => l2
+    | Evm_compute.Bcons t a l1 =>
+      Evm_compute.Bcons t a (app_bl l1 l2)
+  end.
+
+Fixpoint to_bl {T} (f : T -> @sigT Type (fun x => x)) (ls : list T) 
+  (acc : Evm_compute.Blacklist) : Evm_compute.Blacklist :=
+  match ls with
+    | nil => acc
+    | a :: b => Evm_compute.Bcons _ (projT2 (f a)) (to_bl f b acc)
+  end.
+  
 Ltac add_bl get l acc :=
   match l with 
     | @nil _ => acc

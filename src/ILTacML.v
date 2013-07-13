@@ -51,6 +51,34 @@ Ltac sep_canceler bf bb isConst ext :=
         let preds := eval cbv delta [ predsV ] in predsV in
         let puresV := fresh "pures" in
         pose (puresV := pures) ;
+        refine (
+          @CancelTacIL.ApplyCancelSep_slice bf bb typesV funcsV predsV 
+          (TacPackIL.ILAlgoTypes.Algos ext typesV)
+          (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
+          uvars L R puresV _ _);
+          [ cbv beta iota zeta delta 
+            [ Expr.AllProvable Expr.AllProvable_gen Expr.Provable puresV 
+              Expr.exprD nth_error funcsV value error 
+              Expr.Range Expr.Domain Expr.Denotation 
+              Expr.EqDec_tvar Expr.applyD equiv_dec 
+              Expr.tvar_rec Expr.tvar_rect sumbool_rec sumbool_rect
+              Peano_dec.eq_nat_dec nat_rec nat_rect eq_rec_r eq_rect eq_rec 
+              f_equal eq_sym ]; exact proofs
+          | (*TIME         start_timer "sep_canceler:eval" ; *)
+            let bl := constr:(not ::: ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
+            let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
+            let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
+            subst funcsV predsV  ;
+            evm computed_blacklist [ bl ];
+(*TIME         stop_timer "sep_canceler:eval" ; *)
+            clear typesV puresV ;
+            match goal with
+              | |- ?G => 
+                (let H := fresh in assert (H : G) ; [ | (exact H || simple eapply H) ]) ;
+                intros
+            end ]
+(*
+        pose (puresV := pures) ;
         let puresPfV := fresh "pures_proof" in
         assert (puresPfV : Expr.AllProvable funcsV uvars nil puresV) by
           (cbv beta iota zeta delta 
@@ -67,7 +95,7 @@ Ltac sep_canceler bf bb isConst ext :=
           (@TacPackIL.ILAlgoTypes.Algos_correct ext typesV funcsV predsV)
           uvars L R puresV puresPfV);
 (*TIME         stop_timer "sep_canceler:apply" ; *)
-(*TIME         start_timer "sep_canceler:eval" ; *)
+
         (let bl := constr:(not ::: ex ::: emp ::: star ::: inj ::: himp ::: Evm_compute.Bnil) in
          let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (Expr.Denotation x)) funcs bl in
          let bl := ILTacCommon.add_bl ltac:(fun x => eval red in (SEP.SDenotation x)) preds bl in
@@ -79,7 +107,7 @@ Ltac sep_canceler bf bb isConst ext :=
            | |- ?G => 
              (let H := fresh in assert (H : G) ; [ | (exact H || simple eapply H) ]) ;
              intros
-         end *) )
+         end *) ) *)
       in
 (*TIME         start_timer "sep_canceler:reify"; *)
       first [ sep_canceler_plugin types funcs preds pures L R k

@@ -22,7 +22,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
     Variable SymState : Type.
 
     Definition LearnHook : Type := 
-      forall P : ProverT types_, variables -> variables -> SymState -> Facts P -> list (expr types_) -> SymState * Quant.
+      forall P : ProverT types_, variables -> variables -> SymState -> Facts P -> list expr -> SymState * Quant.
 
     Variables pcT stT : tvar.
 
@@ -64,14 +64,14 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
 
     Record MemEvaluator : Type :=
     { sread_word : forall (P : ProverT types), Facts P -> 
-      expr types -> SH.SHeap types -> option (expr types)
+      expr -> SH.SHeap -> option expr
     ; swrite_word : forall (P : ProverT types), Facts P ->
-      expr types -> expr types -> SH.SHeap types -> option (SH.SHeap types)
+      expr -> expr -> SH.SHeap -> option SH.SHeap
 
     ; sread_byte : forall (P : ProverT types), Facts P -> 
-      expr types -> SH.SHeap types -> option (expr types)
+      expr -> SH.SHeap -> option expr
     ; swrite_byte : forall (P : ProverT types), Facts P ->
-      expr types -> expr types -> SH.SHeap types -> option (SH.SHeap types)
+      expr -> expr -> SH.SHeap -> option SH.SHeap
     }.
 
     Variable eval : MemEvaluator.
@@ -176,13 +176,13 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
       Variables pcT stT : tvar.
       Variable prover : ProverT types.
       
-      Definition smemeval_read_word_default (_ : Facts prover) (_ : expr types)
-        (_ : SH.SHeap types) : option (expr types) :=
+      Definition smemeval_read_word_default (_ : Facts prover) (_ : expr)
+        (_ : SH.SHeap) : option expr :=
         None.
 
       Definition smemeval_write_word_default (_ : Facts prover)
-        (_ : expr types) (_ : expr types) (_ : SH.SHeap types)
-        : option (SH.SHeap types) :=
+        (_ : expr) (_ : expr) (_ : SH.SHeap)
+        : option SH.SHeap :=
         None.
     End with_prover.
 
@@ -236,18 +236,18 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
 
       Record MemEvalPred : Type :=
       { pred_read_word  : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs types) (p : expr types),
-          option (expr types)
+        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p : expr),
+          option expr
       ; pred_write_word : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs types) (p v : expr types),
-          option (exprs types)
+        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p v : expr),
+          option (exprs)
 
       ; pred_read_byte  : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs types) (p : expr types),
-          option (expr types)
+        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p : expr),
+          option expr
       ; pred_write_byte : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs types) (p v : expr types),
-          option (exprs types)
+        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p v : expr),
+          option (exprs)
       }.
 
       Variables pcT stT : tvar.
@@ -271,7 +271,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
           Valid PE uvars vars facts ->
           exprD funcs uvars vars pe ptrT = Some p ->
           match 
-            applyD (exprD funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
+            applyD types (exprD funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
             with
             | None => False
             | Some p => mem_satisfies cs (ST.star p Q) stn_st
@@ -288,13 +288,13 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
            exprD funcs uvars vars pe ptrT = Some p ->
            exprD funcs uvars vars ve valT = Some v ->
            match
-             applyD (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
+             applyD types (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
              with
              | None => False
              | Some p => mem_satisfies cs (ST.star p Q) stn_st
            end ->
            match 
-             applyD (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args' _ (SEP.SDenotation Predicate)
+             applyD types (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args' _ (SEP.SDenotation Predicate)
              with
              | None => False
              | Some pr => 
@@ -310,7 +310,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
           Valid PE uvars vars facts ->
           exprD funcs uvars vars pe ptrT = Some p ->
           match 
-            applyD (exprD funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
+            applyD types (exprD funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
             with
             | None => False
             | Some p => mem_satisfies cs (ST.star p Q) stn_st
@@ -327,13 +327,13 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
            exprD funcs uvars vars pe ptrT = Some p ->
            exprD funcs uvars vars ve valT = Some v ->
            match
-             applyD (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
+             applyD types (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args _ (SEP.SDenotation Predicate)
              with
              | None => False
              | Some p => mem_satisfies cs (ST.star p Q) stn_st
            end ->
            match 
-             applyD (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args' _ (SEP.SDenotation Predicate)
+             applyD types (@exprD _ funcs uvars vars) (SEP.SDomain Predicate) args' _ (SEP.SDenotation Predicate)
              with
              | None => False
              | Some pr => 
@@ -348,10 +348,10 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
     Section search_read_write.
       Variable types : list type.
       Variable T : Type.
-      Variable F : exprs types -> option T.
-      Variable F_upd : exprs types -> option (exprs types).
+      Variable F : exprs -> option T.
+      Variable F_upd : exprs -> option (exprs).
 
-      Fixpoint fold_args (es : list (exprs types)) : option T :=
+      Fixpoint fold_args (es : list (exprs)) : option T :=
         match es with 
           | nil => None
           | a :: b => 
@@ -374,7 +374,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
       Qed.
 
 
-      Fixpoint fold_args_update (es : list (exprs types)) : option (list (exprs types)) :=
+      Fixpoint fold_args_update (es : list (exprs)) : option (list (exprs)) :=
         match es with 
           | nil => None
           | a :: b => 
@@ -419,14 +419,14 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
       Variable predIndex : nat.
 
       Definition MemEvalPred_to_MemEvaluator : MemEvaluator types :=
-        {| sread_word := fun (P : ProverT types) (F : Facts P) (p : expr types) (h : SH.SHeap types) =>
+        {| sread_word := fun (P : ProverT types) (F : Facts P) (p : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
              | Some argss => fold_args (fun args => @pred_read_word _ mep P F args p) argss
            end
-         ; swrite_word := fun (P : ProverT types) (F : Facts P) (p v : expr types) (h : SH.SHeap types) =>
+         ; swrite_word := fun (P : ProverT types) (F : Facts P) (p v : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
@@ -442,14 +442,14 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                end
            end
 
-         ; sread_byte := fun (P : ProverT types) (F : Facts P) (p : expr types) (h : SH.SHeap types) =>
+         ; sread_byte := fun (P : ProverT types) (F : Facts P) (p : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
              | Some argss => fold_args (fun args => @pred_read_byte _ mep P F args p) argss
            end
-         ; swrite_byte := fun (P : ProverT types) (F : Facts P) (p v : expr types) (h : SH.SHeap types) =>
+         ; swrite_byte := fun (P : ProverT types) (F : Facts P) (p v : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
@@ -551,7 +551,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                      (SH.sheapD
                         {|
                         SH.impures := FM.remove (elt:=
-                                        list (exprs types)) predIndex
+                                        list (exprs)) predIndex
                                         (SH.impures SH);
                         SH.pures := SH.pures SH;
                         SH.other := SH.other SH |})))) in H5; eauto.
@@ -575,7 +575,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                     (SH.sheapD
                        {|
                        SH.impures := FM.remove (elt:=
-                                       list (exprs types)) predIndex
+                                       list (exprs)) predIndex
                                        (SH.impures SH);
                        SH.pures := SH.pures SH;
                        SH.other := SH.other SH |}))))) 
@@ -595,7 +595,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                   (SH.sheapD
                      {|
                      SH.impures := FM.remove (elt:=
-                                     list (exprs types)) predIndex
+                                     list (exprs)) predIndex
                                      (SH.impures SH);
                      SH.pures := SH.pures SH;
                      SH.other := SH.other SH |})))))).
@@ -630,7 +630,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                      (SH.sheapD
                         {|
                         SH.impures := FM.remove (elt:=
-                                        list (exprs types)) predIndex
+                                        list (exprs)) predIndex
                                         (SH.impures SH);
                         SH.pures := SH.pures SH;
                         SH.other := SH.other SH |})))) in H5; eauto.
@@ -654,7 +654,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                     (SH.sheapD
                        {|
                        SH.impures := FM.remove (elt:=
-                                       list (exprs types)) predIndex
+                                       list (exprs)) predIndex
                                        (SH.impures SH);
                        SH.pures := SH.pures SH;
                        SH.other := SH.other SH |}))))) 
@@ -674,7 +674,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                   (SH.sheapD
                      {|
                      SH.impures := FM.remove (elt:=
-                                     list (exprs types)) predIndex
+                                     list (exprs)) predIndex
                                      (SH.impures SH);
                      SH.pures := SH.pures SH;
                      SH.other := SH.other SH |})))))).

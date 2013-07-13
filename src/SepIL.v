@@ -554,7 +554,7 @@ Module SH := SepHeap.Make ST SEP.
 
 (** This relies on the fact that I'm using PropX **)
 Lemma sheapD_pures : forall ts funcs preds cs U G stn sm h,
-  interp cs ((SEP.sexprD funcs preds U G (SH.sheapD (types := ts) h)) stn sm) ->
+  interp cs ((SEP.sexprD (types := ts) funcs preds U G (SH.sheapD h)) stn sm) ->
   Expr.AllProvable funcs U G (SH.pures h).
 Proof.
   intros.
@@ -584,7 +584,7 @@ Proof.
 Qed.
 
 Lemma sheapD_pures_SF : forall ts funcs preds cs U G stn sm h,
-  interp cs (![(SEP.sexprD funcs preds U G (SH.sheapD (types := ts) h))] (stn, sm)) ->
+  interp cs (![(SEP.sexprD (types := ts) funcs preds U G (SH.sheapD h))] (stn, sm)) ->
   Expr.AllProvable funcs U G (SH.pures h).
 Proof.
   intros.
