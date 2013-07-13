@@ -246,12 +246,10 @@ Section correctness.
     eapply split_smem_get; eauto.
 
     rewrite natToW_S.
-    rewrite wplus_assoc.
-    eapply split_smem_get; eauto.
-    (* right.
-    apply IHbs; try omega.
-    propxFo. *)
-  Admitted.
+    rewrite wplus_assoc. 
+    eapply split_smem_get.  eapply split_comm. eassumption.
+    eapply IHbs. omega. propxFo.
+  Qed.
 
   Lemma array8_bound' : forall cs base stn bs m i,
     (0 < i < length bs)%nat
@@ -340,7 +338,6 @@ Section correctness.
     rewrite natToWord_wordToNat in H0; auto.
   Qed.
 
-(*
   Lemma sym_read_correct : forall P (PE : ProverT_correct P funcs),
     forall args uvars vars cs facts pe p ve stn st,
       sym_read P facts args pe = Some ve ->
@@ -352,7 +349,7 @@ Section correctness.
         | None => False
         | Some p => PropX.interp cs (p stn st)
       end ->
-      match IL.smem_read p st with
+      match smem_get p st with
         | Some b => exprD funcs uvars vars ve wordT = Some (BtoW b)
         | _ => False
       end.
@@ -392,11 +389,13 @@ Section correctness.
     rewrite H2; reflexivity.
   Qed.
 
+  Opaque natToWord. 
   Lemma sym_write_correct'' : forall specs stn v bs p i st,
     (i < length bs)%nat
     -> interp specs (array8 bs p stn st)
     -> exists st', smem_set (p ^+ $(i)) v st = Some st'
-      /\ ST.satisfies specs (array8 (updN bs i v) p) stn st'.
+      /\ interp specs ((array8 (updN bs i v) p) stn st').
+  Proof.
     induction bs.
 
     inversion 1.
@@ -406,53 +405,48 @@ Section correctness.
     intros.
     propxFo.
     destruct i.
-    assert (Ho : smem_get p st = Some a) by (eapply split_smem_get; eauto).
-    eapply smem_set_get_valid in Ho.
-    generalize Ho; instantiate (1 := v); intro Ho'; clear Ho'.
-    case_eq (smem_set p v st); intros; try congruence.
-    do 2 esplit.
-    replace (p ^+ $(0)) with p by W_eq.
-    eauto.
-    simpl.
-    propxFo.
-    assert (smem_set p v x <> None) by (eapply smem_set_get_valid; eauto).
-    case_eq (smem_set p v x); intros; try congruence.
-    exists s0; exists x0; intuition.
-    unfold split in *; intuition subst.
-    eapply smem_set_disjoint; eauto.
-    eapply split_set in H6; eauto.
-    destruct H6.
-    congruence.
-    eapply smem_set_get_eq; eauto.
-    erewrite smem_set_get_neq; eauto.
-
-    eapply IHbs in H3.
-    2: instantiate (1 := i); omega.
-    destruct H3; intuition.
-    rewrite natToW_S.
-    rewrite wplus_assoc.
-    exists (HT.join x x1).
-    eapply split_set in H3.
-    2: destruct H1; apply disjoint_comm; eauto.
-    destruct H3.
-    rewrite disjoint_join by (apply disjoint_comm; auto).
-    destruct H1; subst.
-    intuition.
-    rewrite disjoint_join by auto.
-    auto.
-    propxFo.
-    do 2 eexists; intuition.
-    apply split_comm; apply disjoint_split_join; auto.
-    auto.
-    auto.
+    { assert (smem_get p x <> None) by congruence.
+      assert (smem_set p v x <> None) by (eapply smem_get_set_valid; eauto).
+      case_eq (smem_set p v x); intros; try congruence. clear H5.
+      generalize H6.
+      eapply split_smem_set in H6. 2: eassumption. destruct H6.
+      destruct H5. intro. exists x1.
+      replace (p ^+ $(0)) with p by W_eq.
+      split; auto.
+      simpl.
+      eapply Exists_I with (B := s).
+      eapply Exists_I with (B := x0).
+      eapply And_I.
+      eapply Inj_I; auto.
+      eapply And_I; eauto.
+      eapply Inj_I.
+      split.
+      { eapply smem_set_get_eq; eauto. }
+      { intros. erewrite <- H4. 2: eapply H8. eapply smem_set_get_neq; eauto. } }
+    { eapply IHbs with (i := i) in H3. 2: omega.
+      destruct H3. intuition.
+      generalize H3.
+      eapply split_smem_set in H3. 2: eapply split_comm; eassumption.
+      destruct H3. intuition. exists x2.
+      replace (p ^+ $ (1) ^+ $ (i)) with (p ^+ $ (S i)) in *. 
+      split; auto.
+      { simpl.
+        eapply Exists_I with (B := x).
+        eapply Exists_I with (B := x1).
+        eapply And_I.
+        eapply Inj_I; auto using split_comm.
+        eapply And_I; auto.
+        eapply Inj_I. split; auto. }
+      { rewrite <- wplus_assoc. f_equal.
+        apply natToWord_S. } }
   Qed.
-
 
   Lemma sym_write_correct' : forall i bs p specs stn st v,
     i < natToW (length bs)
     -> interp specs (array8 bs p stn st)
     -> exists st', smem_set (p ^+ i) v st = Some st'
-      /\ ST.satisfies specs (array8 (upd bs i v) p) stn st'.
+      /\ interp specs ((array8 (upd bs i v) p) stn st').
+  Proof.
     intros.
     eapply sym_write_correct'' in H0.
     Focus 2.
@@ -477,16 +471,16 @@ Section correctness.
         applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
         with
         | None => False
-        | Some p => ST.satisfies cs p stn st
+        | Some p => PropX.interp cs (p stn st)
       end ->
       match 
         applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
         with
         | None => False
         | Some pr => 
-          match ST.HT.smem_set p (WtoB v) st with
+          match smem_set p (WtoB v) st with
             | None => False
-            | Some sm' => ST.satisfies cs pr stn sm'
+            | Some sm' => PropX.interp cs (pr stn sm')
           end
       end.
   Proof.
@@ -527,7 +521,6 @@ Section correctness.
     destruct H3; intuition.
     rewrite H7; assumption.
   Qed.
-*)
 End correctness.
 
 Definition MemEvaluator types' : MEVAL.MemEvaluator (types types') :=
@@ -543,14 +536,10 @@ Theorem MemEvaluator_correct types' funcs' preds'
 Proof.
   intros. eapply (@MemPredEval_To_MemEvaluator_correct (types types')); try reflexivity;
   intros; unfold MemEval in *; simpl in *; try discriminate.
-  admit.
-  admit.
-(*
   { generalize (@sym_read_correct types' funcs' P PE). simpl in *. intro.
     eapply H3 in H; eauto. }
   { generalize (@sym_write_correct types' funcs' P PE). simpl in *. intro.
     eapply H4 in H; eauto. }
-*)
 Qed.
 
 Definition pack : MEVAL.MemEvaluatorPackage types_r (tvType 0) (tvType 1) (tvType 0) (tvType 0)

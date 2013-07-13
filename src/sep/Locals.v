@@ -581,188 +581,184 @@ Section correctness.
       | _ => False
     end.
   Proof.
-(*
     simpl; intuition.
     do 5 (destruct args; simpl in *; intuition; try discriminate).
     generalize (deref_correct uvars vars pe); destruct (deref pe); intro Hderef; try discriminate.
 
-    generalize (listIn_correct uvars vars e); destr idtac (listIn e); intro HlistIn.
-    specialize (HlistIn _ (refl_equal _)).
-    rewrite HlistIn in *.
-    repeat match goal with
-             | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
-               match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
-               end
-           end; unfold ValidProp in *.
-    unfold types0 in *.
-    match type of H with
-      | (if ?E then _ else _) = _ => destruct E
-    end; intuition; try discriminate.
-    simpl in H4.
-    case_eq (nth_error l n); [ intros ? Heq | intro Heq ]; rewrite Heq in *; try discriminate.
-    injection H; clear H; intros; subst.
-    generalize (sym_sel_correct uvars vars s e0); intro Hsym_sel.
-    destruct (exprD funcs uvars vars e0 valsT); try tauto.
-    specialize (Hsym_sel _ (refl_equal _)).
-    rewrite Hsym_sel.
-    specialize (Hderef _ H1).
-    destruct Hderef as [ ? [ ] ].
-    subst.
-    unfold types0 in H2.
-    unfold types0 in H1.
-    case_eq (exprD funcs uvars vars e1 natT); [ intros ? Heq' | intro Heq' ]; rewrite Heq' in *; try tauto.
-    case_eq (exprD funcs uvars vars e2 wordT); [ intros ? Heq'' | intro Heq'' ]; rewrite Heq'' in *; try tauto.
-    rewrite H in H4.
-    specialize (H4 (ex_intro _ _ (refl_equal _))).
-    hnf in H4; simpl in H4.
-    rewrite Heq'' in H4.
-    rewrite H in H4.
-    subst.
-    Require Import PropXTac.
-    apply simplify_fwd in H2.
-    destruct H2 as [ ? [ ? [ ? [ ] ] ] ].
-    destruct H3 as [ ? [ ? [ ? [ ] ] ] ].
-    simpl simplify in H2, H3, H5.
-    destruct H5.
-    apply simplify_bwd in H6.
-    generalize (split_semp _ _ _ H3 H7); intro; subst.
-    specialize (smem_read_correct' _ _ _ _ (i := natToW n) H6); intro Hsmem.
-    rewrite natToW_times4.
-    rewrite wmult_comm.
-    unfold natToW in *.
-    erewrite split_smem_get_word; eauto.
-    left.
-    rewrite Hsmem.
-    f_equal.
+    { generalize (listIn_correct uvars vars e); destr idtac (listIn e); intro HlistIn.
+      specialize (HlistIn _ (refl_equal _)).
+      rewrite HlistIn in *.
+      repeat match goal with
+               | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
+                 match goal with
+                   | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
+                   | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                 end
+             end; unfold ValidProp in *.
+      unfold types0 in *.
+      match type of H with
+        | (if ?E then _ else _) = _ => destruct E
+      end; intuition; try discriminate.
+      simpl in H4.
+      case_eq (nth_error l n); [ intros ? Heq | intro Heq ]; rewrite Heq in *; try discriminate.
+      injection H; clear H; intros; subst.
+      generalize (sym_sel_correct uvars vars s e0); intro Hsym_sel.
+      destruct (exprD funcs uvars vars e0 valsT); try tauto.
+      specialize (Hsym_sel _ (refl_equal _)).
+      rewrite Hsym_sel.
+      specialize (Hderef _ H1).
+      destruct Hderef as [ ? [ ] ].
+      subst.
+      unfold types0 in H2.
+      unfold types0 in H1.
+      case_eq (exprD funcs uvars vars e1 natT); [ intros ? Heq' | intro Heq' ]; rewrite Heq' in *; try tauto.
+      case_eq (exprD funcs uvars vars e2 wordT); [ intros ? Heq'' | intro Heq'' ]; rewrite Heq'' in *; try tauto.
+      rewrite H in H4.
+      specialize (H4 (ex_intro _ _ (refl_equal _))).
+      hnf in H4; simpl in H4.
+      rewrite Heq'' in H4.
+      rewrite H in H4.
+      subst.
+      Require Import PropXTac.
+      apply simplify_fwd in H2.
+      destruct H2 as [ ? [ ? [ ? [ ] ] ] ].
+      destruct H3 as [ ? [ ? [ ? [ ] ] ] ].
+      simpl simplify in H2, H3, H5.
+      destruct H5.
+      apply simplify_bwd in H6.
+      subst.
+      eapply split_emp in H3. red in H3. subst. 
+      specialize (smem_read_correct' _ _ _ _ (i := natToW n) H6); intro Hsmem.
+      rewrite natToW_times4.
+      rewrite wmult_comm.
+      unfold natToW in *.
+      unfold smem_read_word.
+      erewrite MSMF.split_multi_read. 3: eapply Hsmem. 2: eassumption. 
 
-    unfold Array.sel.
-    apply array_selN.
-    apply array_bound in H6.
-    rewrite wordToNat_natToWord_idempotent; auto.
+      f_equal.
+      unfold Array.sel.
+      apply array_selN.
+      apply array_bound in H6.
+      rewrite wordToNat_natToWord_idempotent; auto.
+      apply nth_error_Some_length in Heq. 
 
-    apply nth_error_Some_length in Heq.
+      rewrite length_toArray in *.
+      apply Nlt_in.
+      rewrite Nat2N.id.
+      rewrite Npow2_nat.
+      omega.
 
-    rewrite length_toArray in *.
-    apply Nlt_in.
-    rewrite Nat2N.id.
-    rewrite Npow2_nat.
-    omega.
-
-    rewrite length_toArray.
-    apply Nlt_in.
-    repeat rewrite wordToN_nat.
-    repeat rewrite Nat2N.id.
-    apply array_bound in H6.
-    rewrite length_toArray in *.
-    repeat rewrite wordToNat_natToWord_idempotent.
-    eapply nth_error_Some_length; eauto.
-    apply Nlt_in.
-    rewrite Nat2N.id.
-    rewrite Npow2_nat.
-    omega.
-    apply Nlt_in.
-    rewrite Nat2N.id.
-    rewrite Npow2_nat.
-    apply nth_error_Some_length in Heq.
-    omega.
+      rewrite length_toArray.
+      apply Nlt_in.
+      repeat rewrite wordToN_nat.
+      repeat rewrite Nat2N.id.
+      apply array_bound in H6.
+      rewrite length_toArray in *.
+      repeat rewrite wordToNat_natToWord_idempotent.
+      eapply nth_error_Some_length; eauto.
+      apply Nlt_in.
+      rewrite Nat2N.id.
+      rewrite Npow2_nat.
+      omega.
+      apply Nlt_in.
+      rewrite Nat2N.id.
+      rewrite Npow2_nat.
+      apply nth_error_Some_length in Heq.
+      omega. }
 
     (* Now the [Symbolic] case... *)
-    repeat match goal with
-             | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
-               match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
-               end
-           end; unfold ValidProp in *.
-    unfold types0 in *.
-    match type of H with
-      | (if ?E then _ else _) = _ => case_eq E
-    end; intuition; match goal with
-                      | [ H : _ = _ |- _ ] => rewrite H in *
-                    end; try discriminate.
-    simpl in H3, H4, H5.
-    apply andb_prop in H6; destruct H6.
-    apply andb_prop in H6; destruct H6.
-    intuition.
-    destruct (Hderef _ H1) as [ ? [ ? [ ] ] ]; clear Hderef; intuition; subst.
-    rewrite H10 in *.
-    rewrite H5 in *.
-    rewrite H11 in *.
-    specialize (H4 (ex_intro _ _ (refl_equal _))).
-    unfold Provable in H4.
-    injection H; clear H; intros; subst.
-    simpl exprD in *.
-    unfold types0 in *.
-    unfold Provable in *.
-    simpl exprD in *.
-    deconstruct.
-    rewrite H10 in *.
-    specialize (H3 (ex_intro _ _ (refl_equal _))).
-    specialize (H9 (ex_intro _ _ (refl_equal _))).
-    subst.
-    apply simplify_fwd in H2.
-    destruct H2.
-    destruct H.
-    destruct H.
-    destruct H2.
-    destruct H2.
-    destruct H2.
-    destruct H2.
-    destruct H5.
-    simpl in H.
-    simpl in H2.
-    simpl in H5.
-    destruct H5.
-    generalize (split_semp _ _ _ H2 H11); intro; subst.
-    apply simplify_bwd in H9.
+    { repeat match goal with
+               | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
+                 match goal with
+                   | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
+                   | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                 end
+             end; unfold ValidProp in *.
+      unfold types0 in *.
+      match type of H with
+        | (if ?E then _ else _) = _ => case_eq E
+      end; intuition; match goal with
+                        | [ H : _ = _ |- _ ] => rewrite H in *
+                      end; try discriminate.
+      simpl in H3, H4, H5.
+      apply andb_prop in H6; destruct H6.
+      apply andb_prop in H6; destruct H6.
+      intuition.
+      destruct (Hderef _ H1) as [ ? [ ? [ ] ] ]; clear Hderef; intuition; subst.
+      rewrite H10 in *.
+      rewrite H5 in *.
+      rewrite H11 in *.
+      specialize (H4 (ex_intro _ _ (refl_equal _))).
+      unfold Provable in H4.
+      injection H; clear H; intros; subst.
+      simpl exprD in *.
+      unfold types0 in *.
+      unfold Provable in *.
+      simpl exprD in *.
+      deconstruct.
+      rewrite H10 in *.
+      specialize (H3 (ex_intro _ _ (refl_equal _))).
+      specialize (H9 (ex_intro _ _ (refl_equal _))).
+      subst.
+      apply simplify_fwd in H2.
+      destruct H2.
+      destruct H.
+      destruct H.
+      destruct H2.
+      destruct H2.
+      destruct H2.
+      destruct H2.
+      destruct H5.
+      simpl in H.
+      simpl in H2.
+      simpl in H5.
+      destruct H5.
+      subst.
+      eapply split_emp in H2. red in H2; subst.
+      apply simplify_bwd in H9.
 
-    specialize (smem_read_correct' _ _ _ _ (i := natToW (variablePosition' t x1)) H9); intro Hsmem.
-    rewrite wmult_comm in Hsmem.
-    rewrite <- natToW_times4 in Hsmem.
+      specialize (smem_read_correct' _ _ _ _ (i := natToW (variablePosition' t x1)) H9); intro Hsmem.
+      rewrite wmult_comm in Hsmem.
+      rewrite <- natToW_times4 in Hsmem.
 
-    rewrite variablePosition'_4 in Hsmem.
-    erewrite split_smem_get_word; eauto.
-    left.
-    unfold natToW in *.
-    rewrite Hsmem.
-    f_equal.
-    unfold Array.sel.
-    apply array_selN.
-    apply array_bound in H9.
-    rewrite wordToNat_natToWord_idempotent; auto.
+      rewrite variablePosition'_4 in Hsmem.
+      unfold smem_read_word.
+      erewrite MSMF.split_multi_read. 3: eapply Hsmem. 2: eassumption.
+      f_equal.
+      unfold Array.sel.
+      apply array_selN.
+      apply array_bound in H9.
+      rewrite wordToNat_natToWord_idempotent; auto.
 
-    apply nth_error_variablePosition'; auto.
-    rewrite length_toArray in *.
-    apply Nlt_in.
-    rewrite Nat2N.id.
-    rewrite Npow2_nat.
+      apply nth_error_variablePosition'; auto.
+      rewrite length_toArray in *.
+      apply Nlt_in.
+      rewrite Nat2N.id.
+      rewrite Npow2_nat.
 
-    specialize (variablePosition'_length _ _ H4).
-    omega.
+      specialize (variablePosition'_length _ _ H4).
+      omega.
 
-    red.
-    apply array_bound in H9.    
-    repeat rewrite wordToN_nat.
-    rewrite wordToNat_natToWord_idempotent.
-    rewrite wordToNat_natToWord_idempotent.
-    apply Nlt_in.
-    repeat rewrite Nat2N.id.
-    rewrite length_toArray.
-    apply variablePosition'_length; auto.
-    apply Nlt_in.
-    rewrite Npow2_nat.
-    repeat rewrite Nat2N.id.
-    assumption.
-    apply Nlt_in.
-    rewrite Npow2_nat.
-    repeat rewrite Nat2N.id.
-    specialize (variablePosition'_length _ _ H4).
-    rewrite length_toArray in H9.
-    omega.
+      red.
+      apply array_bound in H9.    
+      repeat rewrite wordToN_nat.
+      rewrite wordToNat_natToWord_idempotent.
+      rewrite wordToNat_natToWord_idempotent.
+      apply Nlt_in.
+      repeat rewrite Nat2N.id.
+      rewrite length_toArray.
+      apply variablePosition'_length; auto.
+      apply Nlt_in.
+      rewrite Npow2_nat.
+      repeat rewrite Nat2N.id.
+      assumption.
+      apply Nlt_in.
+      rewrite Npow2_nat.
+      repeat rewrite Nat2N.id.
+      specialize (variablePosition'_length _ _ H4).
+      rewrite length_toArray in H9.
+      omega. }
   Qed.
-*) Admitted.
 
   Theorem sym_write_correct : forall args uvars vars cs summ pe p ve v m stn args',
     sym_write Prover summ args pe ve = Some args' ->
@@ -786,7 +782,6 @@ Section correctness.
         end
     end.
   Proof.
-(*
     simpl; intuition.
     do 5 (destruct args; simpl in *; intuition; try discriminate).
     generalize (deref_correct uvars vars pe); destruct (deref pe); intro Hderef; try discriminate.
@@ -829,22 +824,19 @@ Section correctness.
     destruct H7 as [ ? [ ] ].
     rewrite natToW_times4.
     rewrite wmult_comm.
-    generalize (split_semp _ _ _ H3 H8); intro; subst.
-    eapply split_set_word in H7.
+    subst.
+    eapply split_emp in H3. red in H3; subst.
+    eapply MSMF.split_multi_write in H7. 2: eassumption.
     destruct H7.
-    destruct H; subst.
-    rewrite H10.
+    destruct H3. unfold smem_write_word. rewrite H7.
     unfold locals.
     apply simplify_bwd.
-    exists x4; exists x1.
-    repeat split; auto.
-    exists smem_emp.
-    exists x4.
-    simpl; intuition.
-    apply split_a_semp_a.
-    reflexivity.
-    apply simplify_fwd.
+    exists x4; exists x1. split. apply H3.
+    split. exists smem_emp. exists x4. split.
+    eapply split_emp. reflexivity.
+    split. split; simpl; auto.
 
+    apply simplify_fwd.
     unfold Array.upd in H9.
     rewrite wordToNat_natToWord_idempotent in H9.
     erewrite array_updN in H9; eauto.
@@ -881,113 +873,110 @@ Section correctness.
 
     (* Now the [Symbolic] case... *)
 
-    destruct (Hderef _ H1) as [ ? [ ? [ ? [ ] ] ] ]; clear Hderef; intuition; subst.
-    repeat match goal with
-             | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
-               match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
-               end
-           end; unfold ValidProp in *.
-    unfold types0 in *.
-    match type of H with
-      | (if ?E then _ else _) = _ => case_eq E
-    end; intuition; match goal with
-                      | [ H : _ = _ |- _ ] => rewrite H in *
-                    end; try discriminate.
-    simpl in H7, H8, H9.
-    apply andb_prop in H10; destruct H10.
-    apply andb_prop in H10; destruct H10.
-    intuition.
-    injection H; clear H; intros; subst.
-    simpl applyD.
-    unfold Provable in *.
-    simpl exprD in *.
-    deconstruct.
-    repeat match goal with
-             | [ H : _ = _ |- _ ] => rewrite H in *
-             | [ H : _ |- _ ] => specialize (H (ex_intro _ _ (refl_equal _))); subst
-           end.
-    apply simplify_fwd in H3.
-    destruct H3.
-    destruct H.
-    destruct H.
-    simpl in H.
-    destruct H3.
-    destruct H3.
-    destruct H3.
-    destruct H3.
-    simpl in H3.
-    destruct H9.
-    simpl in H9.
-    destruct H9.
-    apply simplify_bwd in H13.
-    generalize (split_semp _ _ _ H3 H14); intro; subst.
-    eapply smem_write_correct' in H13.
-    destruct H13 as [ ? [ ] ].
-    rewrite <- variablePosition'_4.
-    rewrite natToW_times4.
-    rewrite wmult_comm.
-    eapply split_set_word in H13.
-    destruct H13.
-    generalize (proj2 H); intro; subst.
-    rewrite H16.
-    apply simplify_bwd.
-    esplit.
-    esplit.
-    esplit.
-    simpl.
-    apply disjoint_split_join; auto.
-    esplit.
-    esplit.
-    esplit.
-    esplit.
-    simpl.
-    apply split_a_semp_a.
-    esplit.
-    simpl; intuition.
-    apply semp_smem_emp.
-    apply simplify_fwd.
-    unfold Array.upd in H15.
-    rewrite wordToNat_natToWord_idempotent in H15.
-  
-    rewrite array_updN_variablePosition'; auto.
+    { destruct (Hderef _ H1) as [ ? [ ? [ ? [ ] ] ] ]; clear Hderef; intuition; subst.
+      repeat match goal with
+               | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
+                 match goal with
+                   | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
+                   | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                 end
+             end; unfold ValidProp in *.
+      unfold types0 in *.
+      match type of H with
+        | (if ?E then _ else _) = _ => case_eq E
+      end; intuition; match goal with
+                        | [ H : _ = _ |- _ ] => rewrite H in *
+                      end; try discriminate.
+      simpl in H7, H8, H9.
+      apply andb_prop in H10; destruct H10.
+      apply andb_prop in H10; destruct H10.
+      intuition.
+      injection H; clear H; intros; subst.
+      simpl applyD.
+      unfold Provable in *.
+      simpl exprD in *.
+      deconstruct.
+      repeat match goal with
+               | [ H : _ = _ |- _ ] => rewrite H in *
+               | [ H : _ |- _ ] => specialize (H (ex_intro _ _ (refl_equal _))); subst
+             end.
+      apply simplify_fwd in H3.
+      destruct H3.
+      destruct H.
+      destruct H.
+      simpl in H.
+      destruct H3.
+      destruct H3.
+      destruct H3.
+      destruct H3.
+      simpl in H3.
+      destruct H9.
+      simpl in H9.
+      destruct H9.
+      apply simplify_bwd in H13.
+      subst.
+      eapply split_emp in H3. red in H3; subst.
+      eapply smem_write_correct' in H13.
+      destruct H13 as [ ? [ ] ].
+      rewrite <- variablePosition'_4.
+      rewrite natToW_times4.
+      rewrite wmult_comm.
+      eapply MSMF.split_multi_write in H3. 2: eassumption.
+      destruct H3. destruct H3.
+      unfold smem_write_word. rewrite H14.
+      apply simplify_bwd.
+      esplit.
+      esplit.
+      split.
+      simpl.
+      eassumption.
+      esplit.
+      esplit.
+      esplit.
+      esplit.
+      simpl.
+      2: split; simpl; eauto.
+      eapply split_emp. reflexivity.
+      apply simplify_fwd.
+      unfold Array.upd in H13.
+      rewrite wordToNat_natToWord_idempotent in H13.
+      
+      rewrite array_updN_variablePosition'; auto.
 
-    apply array_bound in H15.
-    rewrite updN_length in H15.
-    apply Nlt_in.
-    rewrite Npow2_nat.
-    repeat rewrite Nat2N.id.
-    apply variablePosition'_length in H8.
-    rewrite length_toArray in H15.
-    omega.
+      apply array_bound in H13.
+      rewrite updN_length in H13.
+      apply Nlt_in.
+      rewrite Npow2_nat.
+      repeat rewrite Nat2N.id.
+      apply variablePosition'_length in H8.
+      rewrite length_toArray in H13.
+      omega.
 
-    assumption.
-    apply H.
-    rewrite length_toArray.
-    apply Nlt_in.
-    repeat rewrite wordToN_nat.
-    repeat rewrite Nat2N.id.
-    rewrite wordToNat_natToWord_idempotent.
-    rewrite wordToNat_natToWord_idempotent.
-    apply variablePosition'_length; auto.
-    apply array_bound in H13.
-    apply Nlt_in.
-    rewrite Npow2_nat.
-    repeat rewrite Nat2N.id.
-    rewrite length_toArray in H13.
-    assumption.
+      assumption.
 
-    apply Nlt_in.
-    rewrite Npow2_nat.
-    repeat rewrite wordToN_nat.
-    repeat rewrite Nat2N.id.
-    apply array_bound in H13.
-    generalize (variablePosition'_length _ _ H8).
-    rewrite length_toArray in H13.
-    omega.
+      rewrite length_toArray.
+      apply Nlt_in.
+      repeat rewrite wordToN_nat.
+      repeat rewrite Nat2N.id.
+      rewrite wordToNat_natToWord_idempotent.
+      rewrite wordToNat_natToWord_idempotent.
+      apply variablePosition'_length; auto.
+      apply array_bound in H13.
+      apply Nlt_in.
+      rewrite Npow2_nat.
+      repeat rewrite Nat2N.id.
+      rewrite length_toArray in H13.
+      assumption.
+
+      apply Nlt_in.
+      rewrite Npow2_nat.
+      repeat rewrite wordToN_nat.
+      repeat rewrite Nat2N.id.
+      apply array_bound in H13.
+      generalize (variablePosition'_length _ _ H8).
+      rewrite length_toArray in H13.
+      omega. }
   Qed.
-*) Admitted.
 
 End correctness.
 
@@ -1052,51 +1041,48 @@ Lemma behold_the_array' : forall p ns,
   -> forall offset, allocated p offset (length ns)
     ===> Ex vs, ptsto32m' nil p offset (toArray ns vs).
 Proof.
-(*
   induction 1; simpl length; unfold allocated; fold allocated; intros.
 
-  simpl.
-  apply Himp_ex_c.
-  exists (fun _ => wzero _).
-  apply Himp_refl.
+  { simpl.
+    apply himp_ex_c. 
+    exists (fun _ => wzero _).
+    apply Himp_refl. }
 
-  eapply Himp_trans; [ apply Himp_ex_star | ].
-  apply Himp'_ex; intro.
-  eapply Himp_trans; [ eapply Himp_star_frame | ]; [ apply Himp_refl | apply IHNoDup | ].
-  eapply Himp_trans; [ apply Himp_star_comm | ].
-  eapply Himp_trans; [ apply Himp_ex_star | ].
-  eapply Himp'_ex; intro.
-  simpl toArray.
-  unfold ptsto32m'; fold ptsto32m'.
+  { eapply Himp_trans; [ apply himp_ex_star | ].
+    apply himp_ex_p; intro.
+    eapply Himp_trans; [ eapply himp_star_frame | ]; [ apply Himp_refl | apply IHNoDup | ].
+    eapply Himp_trans; [ apply himp_star_comm | ].
+    eapply Himp_trans; [ apply himp_ex_star | ].
+    eapply himp_ex_p; intro.
+    simpl toArray.
+    unfold ptsto32m'; fold ptsto32m'.
 
-  replace (match offset with
-             | 0 => p
-             | S _ => p ^+ $ (offset)
-           end) with (p ^+ $(offset)) by (destruct offset; W_eq).
+    replace (match offset with
+               | 0 => p
+               | S _ => p ^+ $ (offset)
+             end) with (p ^+ $(offset)) by (destruct offset; W_eq).
   
-  apply Himp_ex_c; exists (upd x1 x x0).
-  eapply Himp_trans; [ apply Himp_star_comm | ].
-  apply Himp_star_frame.
-  change (upd x1 x x0 x) with (sel (upd x1 x x0) x).
-  rewrite sel_upd_eq by reflexivity.
-  apply Himp_refl.
+    apply himp_ex_c; exists (upd v0 x v).
+    eapply Himp_trans; [ apply himp_star_comm | ].
+    apply himp_star_frame.
+    change (upd v0 x v x) with (sel (upd v0 x v) x).
+    rewrite sel_upd_eq by reflexivity.
+    apply Himp_refl.
 
-  rewrite toArray_irrel by assumption.
-  apply Himp_refl.
+    rewrite toArray_irrel by assumption.
+    apply Himp_refl. }
 Qed.
-*) Admitted.
 
 Theorem Himp_star_Emp : forall P,
   Emp * P ===> P.
-Proof. (*
-  intros; intro cs.
-  destruct (heq_star_emp_l cs P); auto.
-Qed. *)
-Admitted.
+Proof.
+  intros.
+  eapply himp_star_emp_p.
+Qed.
 
 Theorem ptsto32m'_out : forall a vs offset,
   ptsto32m' _ a offset vs ===> ptsto32m _ a offset vs.
-Proof. (*
+Proof.
   induction vs; intros.
 
   apply Himp_refl.
@@ -1108,13 +1094,12 @@ Proof. (*
            end) with (a ^+ $(offset)) by (destruct offset; W_eq).
   destruct vs.
   simpl ptsto32m'.
-  eapply Himp_trans; [ apply Himp_star_comm | ].
+  eapply Himp_trans; [ apply himp_star_comm | ].
   apply Himp_star_Emp.
-  apply Himp_star_frame.
+  apply himp_star_frame.
   apply Himp_refl.
-  auto.
+  eapply IHvs.
 Qed.
-*) Admitted.
 
 Theorem Himp_ex : forall T (P Q : T -> _), 
   (forall v, P v ===> Q v) ->
@@ -1138,34 +1123,33 @@ Lemma do_call' : forall ns ns' vs avail avail' p p',
   -> p' = p ^+ natToW (4 * length ns)
   -> NoDup ns'
   -> locals ns vs avail p ===> locals ns vs 0 p * Ex vs', locals ns' vs' avail' p'.
-Proof. (*
+Proof.
   intros.
   unfold locals.
-  eapply Himp_trans; [ | apply Himp_star_assoc' ]. 
-  apply Himp_star_frame.
+  eapply Himp_trans; [ | apply heq_star_assoc ]. 
+  apply himp_star_frame.
   apply Himp_refl.
 
   subst.
-  eapply Himp_trans; [ | apply Himp_star_Emp' ].
+  eapply Himp_trans; [ | apply himp_star_emp_c ].
   eapply Himp_trans; [ apply allocated_split | ]; eauto.
   replace (0 + 4 * length ns') with (length ns' * 4) by omega.
   replace (4 * length ns) with (length ns * 4) by omega.
   eapply Himp_trans.
-  eapply Himp_star_frame.
+  eapply himp_star_frame.
   apply behold_the_array; auto.
   apply Himp_refl.
-  eapply Himp_trans; [ apply Himp_ex_star | ].
-  apply Himp'_ex; intro vs'.
-  apply Himp_ex_c; exists vs'.
+  rewrite heq_ex_star.
+  apply himp_ex_p; intro vs'.
+  apply himp_ex_c; exists vs'.
   unfold array.  
-  eapply Himp_trans; [ | apply Himp_star_assoc' ].
-  apply Himp_star_pure_cc; auto.
-  apply Himp_star_frame.
+  rewrite heq_star_assoc.
+  apply himp_star_pure_cc; auto.
+  apply himp_star_frame.
   apply Himp_refl.
   apply allocated_shift_base; auto.
   unfold natToW; W_eq.
 Qed.
-*) Admitted.
 
 Definition reserved (p : W) (len : nat) := (p =?> len)%Sep.
 
@@ -1178,20 +1162,19 @@ Lemma expose_avail : forall ns vs avail p expose avail',
   -> avail' = avail - expose
   -> locals ns vs avail p ===> locals ns vs avail' p
   * reserved (p ^+ natToW (4 * (length ns + avail'))) expose.
-Proof. (*
+Proof.
   unfold locals; intros.
-  eapply Himp_trans; [ | apply Himp_star_assoc' ]. 
-  apply Himp_star_frame.
+  eapply Himp_trans; [ | apply heq_star_assoc ]. 
+  apply himp_star_frame.
   apply Himp_refl.  
   subst.
   eapply Himp_trans; [ apply allocated_split | ].
   instantiate (1 := avail - expose); omega.
-  apply Himp_star_frame.
+  apply himp_star_frame.
   apply Himp_refl.
   apply allocated_shift_base; try omega.
   words.
 Qed.
-*) Admitted.
 
 Theorem Himp_refl' : forall P Q,
   P = Q
@@ -1209,15 +1192,15 @@ Theorem do_call : forall ns ns' vs avail avail' p p',
   * Ex vs', locals ns' vs' avail' p'
   * reserved (p ^+ natToW (4 * (length ns + length ns' + avail')))
   (avail - length ns' - avail').
-Proof. (*
+Proof.
   intros; subst.
   eapply Himp_trans; [ apply do_call' | ]; eauto.
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   apply Himp_ex; intro.
   eapply Himp_trans; [ apply expose_avail | ].
   instantiate (1 := avail - length ns' - avail'); omega.
   eauto.
-  apply Himp_star_frame.
+  apply himp_star_frame.
   apply Himp_refl'.
   f_equal; omega.
   apply Himp_refl'.
@@ -1228,11 +1211,10 @@ Proof. (*
     with avail' by omega.
   W_eq.
 Qed.
-*) Admitted.
 
 Lemma ptsto32m'_allocated : forall (p : W) (ls : list W) (offset : nat),
   ptsto32m' nil p offset ls ===> allocated p offset (length ls).
-Proof. (*
+Proof.
   induction ls.
 
   intros; apply Himp_refl.
@@ -1244,38 +1226,50 @@ Proof. (*
              | 0 => p
              | S _ => p ^+ $ (offset)
            end) with (p ^+ $(offset)) by (destruct offset; W_eq).
-  apply Himp_star_frame.
-  apply Himp_ex_c; eexists; apply Himp_refl.
-  auto.
+  apply himp_star_frame.
+  apply himp_ex_c; eexists; apply Himp_refl.
+  eapply IHls.
 Qed.
-*) Admitted.
+
+Lemma ptsto32m_ptsto32m'_himp : forall ls p offset,
+  ptsto32m nil p offset ls ===> ptsto32m' nil p offset ls.
+Proof.
+  induction ls; intros.
+  { simpl ptsto32m'; simpl ptsto32m. eapply Himp_refl. }
+  { unfold ptsto32m'; fold ptsto32m'.
+    unfold ptsto32m; fold ptsto32m.
+    destruct ls; destruct offset; try (rewrite wplus_comm; rewrite wplus_unit).
+    { rewrite heq_star_comm. eapply himp_star_emp_c. }
+    { rewrite heq_star_comm. eapply himp_star_emp_c. }
+    { rewrite IHls; reflexivity. }
+    { rewrite IHls; reflexivity. } }
+Qed.
 
 Lemma ptsto32m_allocated : forall (p : W) (ls : list W) (offset : nat),
   ptsto32m nil p offset ls ===> allocated p offset (length ls).
-Proof. (*
+Proof.
   intros; eapply Himp_trans.
-  apply ptsto32m'_in.
+  eapply ptsto32m_ptsto32m'_himp.
   apply ptsto32m'_allocated.
 Qed.
-*) Admitted.
 
 Lemma do_return' : forall ns ns' vs avail avail' p p',
   avail = avail' + length ns'
   -> p' = p ^+ natToW (4 * length ns)
   -> (locals ns vs 0 p * Ex vs', locals ns' vs' avail' p') ===> locals ns vs avail p.
-Proof. (*
+Proof.
   unfold locals; intros.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  eapply Himp_trans; [ apply himp_star_assoc | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   unfold allocated; fold allocated.
   eapply Himp_trans; [ apply Himp_star_Emp | ].
-  apply Himp'_ex; intro vs'.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_pure_c; intro.
+  apply himp_ex_p; intro vs'.
+  eapply Himp_trans; [ apply himp_star_assoc | ].
+  apply himp_star_pure_c; intro.
   subst.
   eapply Himp_trans; [ | apply allocated_join ].
   2: instantiate (1 := length ns'); omega.
-  apply Himp_star_frame.
+  apply himp_star_frame.
   unfold array.
   words'.
   replace (length ns') with (length (toArray ns' vs')) by apply length_toArray.
@@ -1283,7 +1277,6 @@ Proof. (*
   apply allocated_shift_base; try omega.
   words.
 Qed.
-*) Admitted.
 
 Lemma unexpose_avail : forall ns vs avail p expose avail',
   (expose <= avail)%nat
@@ -1291,18 +1284,17 @@ Lemma unexpose_avail : forall ns vs avail p expose avail',
   -> locals ns vs avail' p
   * reserved (p ^+ natToW (4 * (length ns + avail'))) expose
   ===> locals ns vs avail p.
-Proof. (*
+Proof.
   unfold locals; intros.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  eapply Himp_trans; [ apply himp_star_assoc | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   eapply Himp_trans; [ | apply allocated_join ].
   2: instantiate (1 := avail'); omega.
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   apply allocated_shift_base; try omega.
   subst.
   words.
 Qed.
-*) Admitted.
 
 Lemma do_return : forall ns ns' vs avail avail' p p',
   (avail >= avail' + length ns')%nat
@@ -1311,7 +1303,7 @@ Lemma do_return : forall ns ns' vs avail avail' p p',
     * reserved (p ^+ natToW (4 * (length ns + length ns' + avail')))
     (avail - length ns' - avail'))
     ===> locals ns vs avail p.
-Proof. (*
+Proof.
   intros.
   eapply Himp_trans; [ | apply do_return' ].
   3: eassumption.
@@ -1319,19 +1311,18 @@ Proof. (*
   instantiate (1 := ns').
   instantiate (1 := (avail - avail' - length ns') + avail').
   omega.
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   apply Himp_ex; intro vs'.
   unfold locals.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  eapply Himp_trans; [ apply himp_star_assoc | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   eapply Himp_trans; [ | apply allocated_join ].
   2: instantiate (1 := avail'); omega.
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   apply allocated_shift_base; try omega.
   subst.
   words.
 Qed.
-*) Admitted.
 
 (** ** Point-of-view switch in function preludes *)
 
@@ -1401,7 +1392,7 @@ Lemma ptsto32m'_merge : forall p vs' ns' ns offset vs vs'',
   -> ptsto32m' nil p offset (toArray ns vs)
   * ptsto32m' nil p (offset + 4 * length ns) (toArray ns' vs')
   ===> ptsto32m' nil p offset (toArray (ns ++ ns') vs'').
-Proof. (*
+Proof. 
   induction ns; simpl app; intros.
 
   simpl.
@@ -1417,8 +1408,8 @@ Proof. (*
   simpl in H0.
   simpl toArray; simpl length.
   unfold ptsto32m'; fold ptsto32m'.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_frame.
+  eapply Himp_trans; [ apply himp_star_assoc | ].
+  apply himp_star_frame.
   apply Himp_refl'.
   f_equal.
   assert (Hin : In a (a :: ns ++ ns')) by (simpl; tauto).
@@ -1427,7 +1418,7 @@ Proof. (*
   symmetry; assumption.
 
   eapply Himp_trans; [ | apply IHns ]; auto.
-  apply Himp_star_frame.
+  apply himp_star_frame.
   apply Himp_refl.
   apply Himp_refl'; f_equal; omega.
 
@@ -1440,7 +1431,6 @@ Proof. (*
   tauto.
   rewrite sel_upd_ne by assumption; reflexivity.
 Qed.
-*) Admitted.
 
 Lemma ptsto32m_merge : forall p vs' ns' ns offset vs vs'',
   NoDup (ns ++ ns')
@@ -1448,14 +1438,13 @@ Lemma ptsto32m_merge : forall p vs' ns' ns offset vs vs'',
   -> ptsto32m nil p offset (toArray ns vs)
   * ptsto32m nil p (offset + 4 * length ns) (toArray ns' vs')
   ===> ptsto32m nil p offset (toArray (ns ++ ns') vs'').
-Proof. (*
+Proof.
   intros.
   eapply Himp_trans.
-  apply Himp_star_frame; apply ptsto32m'_in.
+  apply himp_star_frame; apply ptsto32m_ptsto32m'_himp.
   eapply Himp_trans; [ | apply ptsto32m'_out ].
   apply ptsto32m'_merge; auto.
 Qed.
-*) Admitted.
 
 Lemma agree_on_refl : forall vs ns,
   agree_on vs vs ns.
@@ -1467,14 +1456,14 @@ Lemma ptsto32m'_shift_base : forall p n ls offset,
   (n <= offset)%nat
   -> ptsto32m' nil (p ^+ $(n)) (offset - n) ls
   ===> ptsto32m' nil p offset ls.
-Proof. (*
+Proof.
   induction ls.
 
   intros; apply Himp_refl.
 
   unfold ptsto32m'; fold ptsto32m'.
   intros.
-  intro; apply Himp_star_frame.
+  intro; apply himp_star_frame.
   apply Himp_refl'; f_equal.
   rewrite <- wplus_assoc.
   rewrite <- natToW_plus.
@@ -1484,58 +1473,56 @@ Proof. (*
   replace (4 + (offset - n)) with ((4 + offset) - n) by omega.
   apply IHls; omega.
 Qed.
-*) Admitted.
 
 Lemma ptsto32m_shift_base : forall p n ls offset,
   (n <= offset)%nat
   -> ptsto32m nil (p ^+ $(n)) (offset - n) ls
   ===> ptsto32m nil p offset ls.
-Proof. (*
+Proof.
   intros; eapply Himp_trans.
-  apply ptsto32m'_in.
+  apply ptsto32m_ptsto32m'_himp.
   eapply Himp_trans.
   apply ptsto32m'_shift_base; auto.
   apply ptsto32m'_out.
 Qed.
-*) Admitted.
 
 Theorem prelude_in : forall ns ns' vs avail p,
   (length ns' <= avail)%nat
   -> NoDup (ns ++ ns')
   -> locals ns vs avail p ===>
   Ex vs', locals (ns ++ ns') (merge vs vs' ns) (avail - length ns') p.
-Proof. (*
+Proof.
   unfold locals; intros.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_pure_c; intro Hns.
+  eapply Himp_trans; [ apply himp_star_assoc | ].
+  apply himp_star_pure_c; intro Hns.
   eapply Himp_trans.
-  eapply Himp_star_frame; [ apply Himp_refl | ].
+  eapply himp_star_frame; [ apply Himp_refl | ].
   eapply allocated_split.
   eassumption.
-  eapply Himp_trans; [ apply Himp_star_assoc' | ].
+  rewrite <- heq_star_assoc.
   eapply Himp_trans.
-  eapply Himp_star_frame.
-  apply Himp_star_comm.
+  eapply himp_star_frame.
+  apply himp_star_comm.
   apply Himp_refl.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
+  eapply Himp_trans; [ apply himp_star_assoc | ].
   eapply Himp_trans.
-  eapply Himp_star_frame.
+  eapply himp_star_frame.
   apply behold_the_array.
   eapply NoDup_unapp2; eauto.
   apply Himp_refl.
-  eapply Himp_trans; [ apply Himp_ex_star | ].
+  eapply Himp_trans; [ apply himp_ex_star | ].
   apply Himp_ex; intro vs'.
   unfold array.
-  eapply Himp_trans; [ | apply Himp_star_assoc' ].
-  apply Himp_star_pure_cc; auto.
-  eapply Himp_trans; [ apply Himp_star_assoc' | ].
-  apply Himp_star_frame.
+  eapply Himp_trans; [ | apply heq_star_assoc ].
+  apply himp_star_pure_cc; auto.
+  eapply Himp_trans; [ apply heq_star_assoc | ].
+  apply himp_star_frame.
   eapply Himp_trans; [ | apply ptsto32m_merge ]; eauto.
-  eapply Himp_trans; [ apply Himp_star_comm | ].
-  apply Himp_star_frame.
+  eapply Himp_trans; [ apply himp_star_comm | ].
+  apply himp_star_frame.
   apply Himp_refl.
   match goal with
-    | [ |- ?P ===> _ ] =>
+    | [ |- himp ?P _ ] =>
       replace P
     with (ptsto32m nil (p ^+ $ (Datatypes.length ns * 4)) (0 + 4 * length ns - length ns * 4) (toArray ns' vs'))
       by (f_equal; omega)
@@ -1548,44 +1535,41 @@ Proof. (*
   rewrite app_length.
   words.
 Qed.
-*) Admitted.
 
 Lemma ptsto32m'_split : forall p ns' ns offset vs,
   ptsto32m' nil p offset (toArray (ns ++ ns') vs)
   ===> ptsto32m' nil p offset (toArray ns vs)
   * ptsto32m' nil p (offset + 4 * length ns) (toArray ns' vs).
-Proof. (*
+Proof.
   induction ns.
 
   simpl.
   intros.
-  eapply Himp_trans; [ | apply Himp_star_Emp' ].
+  rewrite <- himp_star_emp_c.
   apply Himp_refl'; f_equal; omega.
 
   simpl toArray; simpl length.
   unfold ptsto32m'; fold ptsto32m'.
   intros.
 
-  eapply Himp_trans; [ | apply Himp_star_assoc' ].
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  eapply Himp_trans; [ | apply heq_star_assoc ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   eapply Himp_trans; [ apply IHns | ].
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   apply Himp_refl'; f_equal; omega.
 Qed.
- *) Admitted.
 
 Lemma ptsto32m_split : forall p ns' ns offset vs,
   ptsto32m nil p offset (toArray (ns ++ ns') vs)
   ===> ptsto32m nil p offset (toArray ns vs)
   * ptsto32m nil p (offset + 4 * length ns) (toArray ns' vs).
-Proof. (* 
+Proof.
   intros; eapply Himp_trans.
-  apply ptsto32m'_in.
+  apply ptsto32m_ptsto32m'_himp.
   eapply Himp_trans.
   apply ptsto32m'_split.
-  apply Himp_star_frame; apply ptsto32m'_out.
+  apply himp_star_frame; apply ptsto32m'_out.
 Qed.
-*) Admitted.
 
 Lemma NoDup_unapp1 : forall A (ls1 ls2 : list A),
   NoDup (ls1 ++ ls2)
@@ -1600,14 +1584,14 @@ Lemma ptsto32m'_shift_base' : forall p n ls offset,
   (n <= offset)%nat
   -> ptsto32m' nil p offset ls
   ===> ptsto32m' nil (p ^+ $(n)) (offset - n) ls.
-Proof. (*
+Proof.
   induction ls.
 
   intros; apply Himp_refl.
 
   unfold ptsto32m'; fold ptsto32m'.
   intros.
-  intro; apply Himp_star_frame.
+  intro; apply himp_star_frame.
   apply Himp_refl'; f_equal.
   rewrite <- wplus_assoc.
   rewrite <- natToW_plus.
@@ -1617,43 +1601,41 @@ Proof. (*
   replace (4 + (offset - n)) with ((4 + offset) - n) by omega.
   apply IHls; omega.
 Qed.
-*) Admitted.
 
 Lemma ptsto32m_shift_base' : forall p n ls offset,
   (n <= offset)%nat
   -> ptsto32m nil p offset ls
   ===> ptsto32m nil (p ^+ $(n)) (offset - n) ls.
-Proof. (*
+Proof.
   intros; eapply Himp_trans.
-  apply ptsto32m'_in.
+  apply ptsto32m_ptsto32m'_himp.
   eapply Himp_trans.
   apply ptsto32m'_shift_base'.
   2: apply ptsto32m'_out.
   auto.
 Qed.
-*) Admitted.
 
 Theorem prelude_out : forall ns ns' vs avail p,
   (length ns' <= avail)%nat
   -> locals (ns ++ ns') vs (avail - length ns') p
   ===> locals ns vs avail p.
-Proof. (*
+Proof.
   unfold locals; intros.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_pure_c; intro Hboth.
-  eapply Himp_trans; [ | apply Himp_star_assoc' ].
-  apply Himp_star_pure_cc.
+  eapply Himp_trans; [ apply heq_star_assoc | ].
+  apply himp_star_pure_c; intro Hboth.
+  eapply Himp_trans; [ | apply heq_star_assoc ].
+  apply himp_star_pure_cc.
   eapply NoDup_unapp1; eauto.
   unfold array.
   eapply Himp_trans.
-  eapply Himp_star_frame.
+  eapply himp_star_frame.
   apply ptsto32m_split.
   apply Himp_refl.
-  eapply Himp_trans; [ apply Himp_star_assoc | ].
-  apply Himp_star_frame; [ apply Himp_refl | ].
+  eapply Himp_trans; [ apply heq_star_assoc | ].
+  apply himp_star_frame; [ apply Himp_refl | ].
   eapply Himp_trans; [ | apply allocated_join ].
   2: eassumption.
-  apply Himp_star_frame.
+  apply himp_star_frame.
   eapply Himp_trans; [ apply ptsto32m_allocated | ].
   apply allocated_shift_base.
   words.
@@ -1662,7 +1644,6 @@ Proof. (*
   rewrite app_length; words.
   auto.
 Qed.
-*) Admitted. 
 
 Lemma toArray_sel : forall x V V' ns',
   In x ns'

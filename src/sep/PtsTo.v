@@ -185,45 +185,60 @@ Module BedrockPtsToEvaluator.
       revert H; consider (expr_equal Prover summ ptrT pe e); intros; try congruence.
       inversion H6; clear H6; subst. simpl.
       rewrite H1. rewrite H2.
-
       consider (smem_write_word stn p v m); intros; unfold ptsto32 in *.
-      PropXTac.propxFo.
-      { eapply MSMF.split_multi_read_write_eq. 
-        instantiate (1 := fun v => let '(a,b,c,d) := IL.explode stn v in (a,(b,(c,(d,tt))))).
-        rewrite <- (IL.implode_explode stn v) at 2.
-        destruct (IL.explode stn v) as [ [ [ ] ] ]. reflexivity.
-        simpl. clear.
-        { admit. }
-        eapply H6. }
-      { (*
-
-        red. simpl. specialize (H8 p).
-        clear - H8
-        
-        simpl.
-      SearchAbout MultiMem.multi_write.
-      eapply smem_write_get_word_eq; eauto.
-      eapply IL.implode_explode.
-      unfold smem_set_word in H6.
-      unfold H.footprint_w in H6.
-      destruct (IL.explode stn v) as [ [ [ ] ] ].
-      repeat match type of H6 with
-               | match ?E with None => _ | _ => _ end = Some _ =>
-                 let Heq := fresh "Heq" in case_eq E;
-                   [ intros ? Heq | intro Heq ];
-                   rewrite Heq in *; try discriminate
-             end.
-      Require Import Nomega.
-      repeat erewrite smem_set_get_neq by eauto.
-      eapply expr_equal_correct in H; [ | eauto | eauto | eauto ].
-      subst.
-      auto.
-      
-      eapply expr_equal_correct in H; eauto. subst.
-      unfold ST.satisfies in H5. PropXTac.propxFo.
-      eapply smem_set_get_valid_word; eauto. *) admit. }
-    { eapply expr_equal_correct in H; eauto. subst.
-      PropXTac.propxFo. admit. }
+      { Opaque Word.natToWord.
+        PropXTac.propxFo.
+        { eapply MSMF.split_multi_read_write_eq. 
+          instantiate (1 := fun v => let '(a,b,c,d) := IL.explode stn v in (a,(b,(c,(d,tt))))).
+          rewrite <- (IL.implode_explode stn v) at 2.
+          destruct (IL.explode stn v) as [ [ [ ] ] ]. reflexivity.
+          simpl. clear.
+          { red. repeat constructor; simpl; auto; intro;
+                 repeat match goal with
+                          | H : _ \/ _ |- _ => destruct H
+                        end; auto;
+                 try match goal with
+                       | H : Word.wplus ?p _ = ?p |- _ =>
+                         rewrite <- (Word.wplus_unit p) in H at 2
+                     end;
+                 repeat rewrite (Word.wplus_comm p) in H ;
+                 eapply IL.cancel in H ;
+                 inversion H. }
+          { eapply H6. } }
+        { eapply expr_equal_correct in H; eauto. subst.
+          unfold smem_write_word in H6. simpl in H6. unfold MultiMem.multi_write in H6.
+          simpl in H6. destruct (IL.explode stn v); simpl in *. destruct p. destruct p; simpl in *.
+          repeat match goal with
+                   | _ : match ?X with _ => _ end = _ |- _ =>
+                     consider X; intros; try congruence
+                 end.
+          inversion H14; clear H14; subst.
+          assert (smem_get a' m = None). eapply H8; eauto.
+          clear H8.
+          repeat match goal with
+                   | H' : smem_get ?p ?s = None , H : smem_set _ _ ?s = Some _ |- _ =>
+                     erewrite <- smem_set_get_neq in H'; [ | eapply H | eauto ]
+                 end; auto. } }
+      { PropXTac.propxFo.
+        eapply expr_equal_correct in H; eauto. subst.
+        clear - H7 H6.
+        unfold smem_read_word, smem_write_word in *. 
+        unfold MultiMem.multi_read, MultiMem.multi_write in *. simpl in *.
+        repeat match goal with
+                 | H : match smem_get ?p ?m with _ => _ end = Some _ |- _ =>
+                   (consider (smem_get p m); intros; try congruence); [ ]
+                 | H : match ?X with _ => _ end = _ |- _ =>
+                   (consider X; intros; try congruence)
+               end;
+          match goal with
+            | H : smem_set ?p ?v ?m = None |- _ =>
+              assert (smem_get p m <> None) ; [ | eapply smem_get_set_valid; try eassumption ]
+          end; 
+        repeat (erewrite smem_set_get_neq; [ | eassumption | ]); try congruence;
+        try match goal with
+              | |- not (?X = Word.wplus ?X _) => rewrite <- (Word.wplus_unit X) at 1
+            end;
+        repeat rewrite (Word.wplus_comm t); try eapply IL.cancel_contra; try solve [ intro X; inversion X ]. }
     Qed.
   End correctness.
 

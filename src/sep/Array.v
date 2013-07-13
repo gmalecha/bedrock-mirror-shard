@@ -660,87 +660,93 @@ Section correctness.
     unfold ptsto32m' in *.
     fold ptsto32m' in *.
     destruct i; simpl updN.
-    rewrite wmult_comm.
-    rewrite <- natToW_times4.
-    replace (offset + 0) with offset by omega.
-    unfold ptsto32m'.
-    fold ptsto32m'.
-    apply simplify_fwd in H0.
-    destruct H0.
-    destruct H0.
-    destruct H0.
-    destruct H1.
-    hnf in H1.
-    unfold natToW.
-    destruct H1.
-(*
-    specialize (smem_set_get_valid_word _ (explode stn) _ _ v _ H1).
-    match goal with
-      | [ |- ?E <> None -> _ ] => case_eq E; intuition
-    end.
-    exists (HT.join s x0); split.
-    destruct H0; subst.
-    eapply split_set_word in H4; intuition eauto.
-    
-    apply simplify_bwd.
-    exists s; exists x0.
-    split.
-    apply disjoint_split_join.
-    eapply split_set_word in H4; intuition eauto.
-    destruct H0; auto.
-    split; auto.
-    hnf.
-    split.
-    eapply smem_set_get_word_eq.
-    2: eauto.
-    apply implode_explode.
+    { rewrite wmult_comm.
+      rewrite <- natToW_times4.
+      replace (offset + 0) with offset by omega.
+      unfold ptsto32m'.
+      fold ptsto32m'.
+      apply simplify_fwd in H0.
+      destruct H0.
+      destruct H0.
+      destruct H0.
+      destruct H1.
+      hnf in H1.
+      unfold natToW.
+      destruct H1.
+      
+      unfold smem_read_word in *.
 
-    intros.
-    unfold smem_set_word in H4.
-    unfold H.footprint_w in H4.
-    destruct (explode stn v) as [ [ [ ] ] ].
-    repeat match type of H4 with
-             | match ?E with None => _ | _ => _ end = Some _ =>
-               let Heq := fresh "Heq" in case_eq E;
-                 [ intros ? Heq | intro Heq ];
-                 rewrite Heq in *; try discriminate
-           end.
-    intuition idtac.
-    repeat erewrite smem_set_get_neq by eauto.
-    auto.
-
-    apply simplify_fwd in H0.
-    destruct H0.
-    destruct H0.
-    destruct H0.
-    destruct H1.
-    apply simplify_bwd in H2.
-    replace (4 + offset * 4) with (S offset * 4) in H2 by omega.
-    apply (IHws i) in H2; clear IHws; try omega.
-    destruct H2; intuition.
-    exists (HT.join x x1); split; auto.
-    replace (offset + S i) with (S offset + i) by omega.
-    destruct H0; subst.
-    eapply split_set_word in H3.
-    2: apply disjoint_comm; eauto.
-    rewrite disjoint_join by auto.
-    rewrite (disjoint_join x x1) by (apply disjoint_comm; tauto).
-    tauto.
-
-    unfold ptsto32m'.
-    fold ptsto32m'.
-    apply simplify_bwd.
-    exists x; exists x1.
-    split.
-    apply disjoint_split_join.
-    destruct H0; auto.
-    eapply split_set_word in H3.
-    2: apply disjoint_comm; eauto.      
-    apply disjoint_comm; tauto.
-    split; auto.
+      match goal with 
+        | _ : ?X = Some _ |- _ =>
+          assert (X <> None) by congruence
+      end.
+      specialize (@MSMF.smem_set_get_valid_multi W 4 (fun a : W =>
+                                                        let '(a0, b, c, d) := footprint_w a in (a0, (b, (c, (d, tt)))))
+                                                 (fun v : MultiMem.vector B 4 =>
+                                                    let '(a, (b, (c, (d, _)))) := v in implode stn (a, b, c, d))
+                                                 (fun v0 : W =>
+                                                    let '(a0, b, c, d) := explode stn v0 in (a0, (b, (c, (d, tt)))))
+                                                 (base ^+ $ (offset * 4)) v x H4); clear H4; intro.
+      match goal with 
+        | _ : not (?X = None) |- _ =>
+          consider X; try congruence; intros
+      end.
+      clear H5.
+      simpl in H0.
+      generalize H4.
+      eapply MSMF.split_multi_write in H4; try solve [ intuition eauto ].
+      destruct H4. destruct H4. intro.
+      exists (join s x0); split. 
+      { destruct H4; subst; auto. }
+      { unfold starB, star, STK.istar.
+        eapply Exists_I with (B := s). eapply Exists_I with (B := x0).
+        eapply And_I.
+        apply Inj_I. destruct H4; split; auto.
+        eapply And_I. 2: propxFo.
+        apply Inj_I.
+        split.
+        { unfold smem_read_word, MultiMem.multi_read.
+          eapply MSMF.smem_read_write_eq_multi' with (k := (fun v0 : MultiMem.vector B 4 =>
+      let '(a0, (b, (c, (d, _)))) := v0 in implode stn (a0, b, c, d))) in H6.
+          clear - H6. etransitivity. eapply H6. f_equal.
+          clear. consider (explode stn v); simpl. destruct p as [ [ ] ]. intros. 
+          rewrite <- H. eapply implode_explode.
+          Theorem footprint_w_NoDup : forall p,
+                                        MultiMem.NoDup_v M.addr 4
+                                                         (let '(a0, b, c, d) := footprint_w p in
+                                                          (a0, (b, (c, (d, tt))))).
+          Proof.
+            clear. Opaque natToWord. simpl; intros.
+            cut (MultiMem.NoDup_v M.addr 4
+                                     (p ^+ $(0), (p ^+ $ (1), (p ^+ $ (2), (p ^+ $ (3), tt))))).
+            rewrite Word.wplus_comm. rewrite Word.wplus_unit. auto.
+            repeat constructor; simpl; intuition; auto;
+            match goal with
+              | H0 : _ = _ |- _ =>
+                do 2 (rewrite (Word.wplus_comm p) in H0); apply Word.wplus_cancel in H0; inversion H0
+            end.
+          Qed.
+          eapply footprint_w_NoDup. }
+        { intro. specialize (H3 a'). intuition.
+          erewrite <- MSMF.smem_multi_write_footprint.
+          eassumption. eapply H6.
+          clear - H8 H7 H9 H11. simpl. intuition. } } }
+    { simpl.
+      eapply STK.interp_star in H0. do 3 destruct H0. destruct H1.
+      replace (base ^+ $ (4) ^* $ (offset + S i)) with
+              (base ^+ $ (4) ^* $ ((S offset) + i)) in H2 by (f_equal; f_equal; f_equal; omega).
+      assert (i < length ws)%nat by omega.
+      destruct (@IHws i x0 (S offset) H3 H2).
+      destruct H4. replace (offset + S i)%nat with (S offset + i)%nat by omega.
+      generalize H4; intro.
+      eapply MSMF.split_multi_write in H4. 2: eapply split_comm; eassumption.
+      destruct H4. intuition. eexists. split. eapply H8.
+      eapply Exists_I with (B := x).
+      eapply Exists_I with (B := x1).
+      eapply And_I.
+      2: eapply And_I; eauto.
+      eapply Inj_I. eapply split_comm; auto. }
   Qed.
-*)
-  Admitted.
 
   Lemma smem_write_correct' : forall i ws cs base stn m v,
     i < natToW (length ws)
@@ -756,12 +762,11 @@ Section correctness.
     repeat rewrite wordToN_nat in *.
     repeat rewrite Nat2N.id in *.
     rewrite wordToNat_natToWord_idempotent in H; auto.
-    admit. (*
     apply array_bound in H0.
     apply Nlt_in.
     rewrite Nat2N.id.
     rewrite Npow2_nat.
-    assumption. *)
+    assumption. 
 
     apply ptsto32m'_in; auto.
 
