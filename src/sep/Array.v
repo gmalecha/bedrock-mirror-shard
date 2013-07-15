@@ -72,14 +72,14 @@ Local Notation "'wplusF'" := 0.
 Local Notation "'wmultF'" := 2.
 Local Notation "'wltF'" := 4.
 Local Notation "'natToWF'" := 5.
-Local Notation "'lengthF'" := 6.
-Local Notation "'selF'" := 7.
-Local Notation "'updF'" := 8.
+Local Notation "'lengthF'" := 8.
+Local Notation "'selF'" := 9.
+Local Notation "'updF'" := 10.
 
 Section parametric.
   Variable types' : list type.
   Definition types := repr types_r types'.
-  Variable Prover : ProverT types.
+  Variable Prover : ProverT.
 
   Definition natToW_r : signature types.
     refine {| Domain := natT :: nil; Range := wordT |}.
@@ -111,40 +111,43 @@ Section parametric.
         None ::
         Some (ILEnv.wlt_r types) ::
         Some (ILEnv.natToW_r types) ::
+        Some (O_r types) ::
+        Some (S_r types) ::
         Some wlength_r ::
         Some sel_r ::
         Some upd_r ::
         nil
       in Env.listOptToRepr lst (Default_signature _).
 
-  Definition deref (e : expr types) : option (expr types * expr types) :=
+  Definition deref (e : expr) : option (expr * expr) :=
     match e with
       | Func wplusF (base :: offset :: nil) =>
         match offset with
-          | Func wmultF (Func natToWF (Const t k :: nil) :: offset :: nil) =>
-            match t return tvarD types t -> _ with
-              | natT => fun k => match k with
-                                   | 4 => Some (base, offset)
-                                   | _ => None
-                                 end
-              | _ => fun _ => None
-            end k
-          | Func natToWF (Const t k :: nil) =>
-            match t return tvarD types t -> _ with
-              | natT => fun k => match div4 k with
-                                   | None => None
-                                   | Some k' => Some (base, Func natToWF (Const (types := types) (t := natT) k'
-                                     :: nil))
-                                 end
-              | _ => fun _ => None
-            end k
+          | Func wmultF (Func natToWF (k :: nil) :: offset :: nil) =>
+            match toConst_nat k with
+              | None => None
+              | Some k => 
+                match k with
+                  | 4 => Some (base, offset)
+                  | _ => None
+                end
+            end
+          | Func natToWF (k :: nil) =>
+            match toConst_nat k with
+              | Some k => 
+                match div4 k with
+                  | None => None
+                  | Some k' => Some (base, Func natToWF (toExpr_nat k' :: nil))
+                end
+              | None => None
+            end
           | _ => None
         end
       | _ => None
     end.
 
-  Definition sym_read (summ : Prover.(Facts)) (args : list (expr types)) (p : expr types)
-    : option (expr types) :=
+  Definition sym_read (summ : Prover.(Facts)) (args : list expr) (p : expr)
+    : option expr :=
     match args with
       | ws :: p' :: nil =>
         match deref p with
@@ -159,8 +162,8 @@ Section parametric.
       | _ => None
     end.
 
-  Definition sym_write (summ : Prover.(Facts)) (args : list (expr types)) (p v : expr types)
-    : option (list (expr types)) :=
+  Definition sym_write (summ : Prover.(Facts)) (args : list expr) (p v : expr)
+    : option (list expr) :=
     match args with
       | ws :: p' :: nil =>
         match deref p with
@@ -176,7 +179,7 @@ Section parametric.
     end.
 End parametric.
 
-Definition MemEval types' : @MEVAL.PredEval.MemEvalPred (types types').
+Definition MemEval : MEVAL.PredEval.MemEvalPred.
   apply MEVAL.PredEval.Build_MemEvalPred.
   apply sym_read.
   apply sym_write.
@@ -193,6 +196,7 @@ Ltac destr simp E :=
   match E with
     | context[match _ with None => _ | _ => _ end] => fail 1
     | div4 _ => fail 1
+    | toConst_nat _ => fail 1
     | _ => destr' E; discriminate || tauto
     | _ => destr' E; try (discriminate || tauto); [simp]
   end.
@@ -217,23 +221,24 @@ Ltac doMatch simp P :=
   match P with
     | match ?E with 0 => _ | _ => _ end => destr2 simp E
     | match ?E with nil => _ | _ => _ end => destr simp E
-    | match ?E with Const _ _ => _ | _ => _ end => destr2 simp E
+    | match ?E with Var _ => _ | _ => _ end => destr2 simp E 
     | match ?E with tvProp => _ | _ => _ end => destr simp E
     | match ?E with None => _ | _ => _ end => destr simp E
     | match ?E with left _ => _ | _ => _ end => destr2 simp E
   end.
 
-Ltac deconstruct' simp := match goal with
-                            | [ H : Some _ = Some _ |- _ ] => injection H; clear H; intros; subst; simp
-                            | [ H : ?P |- _ ] =>
-                              let P := stripSuffix P in
-                                doMatch simp P
-                                || match P with
-                                     | match ?P with None => _ | _ => _ end =>
-                                       let P := stripSuffix P in
-                                         doMatch simp P
-                                   end
-                          end.
+Ltac deconstruct' simp := 
+  match goal with
+    | [ H : Some _ = Some _ |- _ ] => injection H; clear H; intros; subst; simp
+    | [ H : ?P |- _ ] =>
+      let P := stripSuffix P in
+         doMatch simp P
+      || match P with
+           | match ?P with None => _ | _ => _ end =>
+             let P := stripSuffix P in
+             doMatch simp P
+         end
+  end.
 
 Ltac deconstruct := repeat deconstruct' ltac:(simpl in *).
 
@@ -255,7 +260,7 @@ Section correctness.
   Variable funcs' : functions types0.
   Definition funcs := Env.repr (funcs_r _) funcs'.
 
-  Variable Prover : ProverT types0.
+  Variable Prover : ProverT.
   Variable Prover_correct : ProverT_correct Prover funcs.
 
   Lemma div4_correct' : forall n0 n m, (n < n0)%nat
@@ -290,16 +295,53 @@ Section correctness.
       match goal with
         | [ H : _ = _ |- _ ] => rewrite H in *
       end; try discriminate.
-    deconstruct; eauto.
-    match goal with
-      | [ _ : context[div4 ?N] |- _ ] => specialize (div4_correct N); destruct (div4 N)
-    end; try discriminate.
-    deconstruct.
-    specialize (H2 _ (refl_equal _)); subst.
-    repeat (esplit || eassumption).
-    replace (n + (n + (n + (n + 0)))) with (n * 4) by omega.
-    rewrite natToW_times4.
-    W_eq.
+    destruct f; try discriminate.
+    { destruct l; try discriminate.
+      destruct e0; try discriminate.
+      do 6 (destruct f; try discriminate).
+      do 2 (destruct l0; try discriminate).
+      do 2 (destruct l; try discriminate).
+      Require Import ExtLib.Tactics.Consider.
+      consider (toConst_nat e0); intros; try discriminate.
+      generalize  (@toConst_nat_sound types0 funcs _ n H0 uvars vars).
+      match goal with
+        | |- _ -> ?X =>
+          change (exprD funcs uvars vars e0 natT = Some n -> X)
+      end.
+      intro H3. simpl in H. rewrite H3 in *.
+      do 5 (destruct n; try discriminate).
+      inversion H2; clear H2; subst.
+      rewrite H1 in *.
+      destruct (exprD funcs uvars vars offset wordT); try discriminate.
+      inversion H; clear H; subst.
+      do 2 eexists. split; eauto. }
+    { do 3 (destruct f; try discriminate).
+      do 2 (destruct l; try discriminate).
+      consider (toConst_nat e0); intros; try discriminate.
+      generalize  (@toConst_nat_sound types0 funcs _ n H0 uvars vars).
+      match goal with
+        | |- _ -> ?X =>
+          change (exprD funcs uvars vars e0 natT = Some n -> X)
+      end.
+      match goal with
+        | [ _ : context[div4 ?N] |- _ ] => 
+          specialize (div4_correct N); destruct (div4 N)
+      end; try discriminate.
+      inversion H2; clear H2; subst; intros.
+      simpl in *.
+      specialize (H2 _ (refl_equal _)); subst.
+      rewrite H1 in *. rewrite H3 in *.
+      generalize (@toExpr_nat_sound types0 funcs n0 uvars vars).
+      match goal with
+        | |- _ -> ?X =>
+          change (exprD funcs uvars vars (toExpr_nat n0) natT = Some n0 -> X)
+      end.
+      intro. rewrite H2.
+      repeat (esplit || eassumption).
+      inversion H; clear H; subst.
+      replace (n0 + (n0 + (n0 + (n0 + 0)))) with (n0 * 4) by omega.
+      rewrite natToW_times4.
+      W_eq. }
   Qed.
 
   Fixpoint ptsto32m' sos (a : W) (offset : nat) (vs : list W) : hpropB sos :=
@@ -311,6 +353,7 @@ Section correctness.
   Theorem ptsto32m'_in : forall a cs stn vs offset m,
     interp cs (ptsto32m _ a offset vs stn m)
     -> interp cs (ptsto32m' _ a offset vs stn m).
+  Proof.
     induction vs.
 
     auto.
@@ -375,6 +418,7 @@ Section correctness.
     interp cs (ptsto32m' _ base (offset * 4) ws stn m)
     -> (i < length ws)%nat
     -> smem_read_word stn (base ^+ $((offset + i) * 4)) m = Some (selN ws i).
+  Proof.
     induction ws.
 
     simpl length.
@@ -540,7 +584,7 @@ Section correctness.
     Valid Prover_correct uvars vars summ ->
     exprD funcs uvars vars pe wordT = Some p ->
     match 
-      applyD (exprD funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
+      applyD types0 (exprD funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
       with
       | None => False
       | Some p => PropX.interp cs (p stn m)
@@ -555,40 +599,29 @@ Section correctness.
     do 3 (destruct args; simpl in *; intuition; try discriminate).
     generalize (deref_correct uvars vars pe); destr ltac:(simpl in *) (deref pe); intro Hderef.
     destruct p0.
-
-    repeat match goal with
-             | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
-               match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
-               end
-           end; unfold ValidProp in *; simpl in *.
-
     match goal with
       | [ _ : (if ?E then _ else _) = Some _ |- _ ] => case_eq E; intro Heq; rewrite Heq in *
     end; try discriminate.
-    unfold types0 in *; simpl in *.
+    eapply andb_true_iff in Heq. destruct Heq.
+    eapply Prove_correct in H3. 2: eassumption.
+    eapply Prove_correct in H4. 2: eassumption.
+    unfold ValidProp in *. simpl in *.
+    inversion H; clear H; subst.
+    specialize (Hderef _ _ _ H1 eq_refl).
+    destruct Hderef. destruct H. destruct H. destruct H5.
     unfold Provable in *; simpl in *.
-    deconstruct.
-    repeat match goal with
-             | [ H : _ |- _ ] => apply andb_prop in H; intuition
-           end.
-    rewrite H1 in *.
-    specialize (Hderef _ _ _ (refl_equal _) (refl_equal _)); destruct Hderef as [ ? [ ] ]; intuition.
-    subst.
-    simpl in *.
-    rewrite H4 in *.
-    rewrite H7 in *.
-    specialize (H6 (ex_intro _ _ (refl_equal _))).
-    specialize (H3 (ex_intro _ _ (refl_equal _))); subst.
-    red in H2.
-
+    rewrite H in *. rewrite H5 in *.
+    consider (exprD funcs uvars vars e listWT); intros; try solve [ intuition ].
+    consider (exprD funcs uvars vars e0 wordT); intros; try solve [ intuition ].
+    specialize (H7 (ex_intro _ _ (refl_equal _))).
+    specialize (H4 (ex_intro _ _ (refl_equal _))); subst.
     eapply smem_read_correct'; eauto.
   Qed.
 
   Theorem ptsto32m'_out : forall a cs stn vs offset m,
     interp cs (ptsto32m' _ a offset vs stn m)
     -> interp cs (ptsto32m _ a offset vs stn m).
+  Proof.
     induction vs.
 
     auto.
@@ -784,13 +817,13 @@ Section correctness.
     exprD funcs uvars vars pe wordT = Some p ->
     exprD funcs uvars vars ve wordT = Some v ->
     match
-      applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
+      applyD types0 (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
       with
       | None => False
       | Some p => PropX.interp cs (p stn m)
     end ->
     match 
-      applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
+      applyD types0 (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
       with
       | None => False
       | Some pr => 
@@ -839,13 +872,13 @@ Section correctness.
   Qed.
 End correctness.
 
-Definition MemEvaluator types' : MEVAL.MemEvaluator (types types') :=
+Definition MemEvaluator : MEVAL.MemEvaluator :=
   Eval cbv beta iota zeta delta [ MEVAL.PredEval.MemEvalPred_to_MemEvaluator ] in 
-    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ (MemEval types') 1.
+    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator MemEval 1.
 
 Theorem MemEvaluator_correct types' funcs' preds'
   : @MEVAL.MemEvaluator_correct (Env.repr types_r types') (tvType 0) (tvType 1) 
-  (MemEvaluator (Env.repr types_r types')) (funcs funcs') (Env.repr (ssig_r _) preds')
+  MemEvaluator (funcs funcs') (Env.repr (ssig_r _) preds')
   (IL.settings * IL.state) (tvType 0) (tvType 0)
   (@IL_mem_satisfies (types types')) (@IL_ReadWord (types types')) (@IL_WriteWord (types types'))
   (@IL_ReadByte (types types')) (@IL_WriteByte (types types')).
@@ -867,5 +900,5 @@ Definition pack : MEVAL.MemEvaluatorPackage types_r (tvType 0) (tvType 1) (tvTyp
   funcs_r
   (fun ts => Env.listOptToRepr (None :: Some (ssig ts) :: nil)
     (SEP.Default_predicate (Env.repr types_r ts)))
-  (fun ts => MemEvaluator _)
+  MemEvaluator
   (fun ts fs ps => MemEvaluator_correct _ _).

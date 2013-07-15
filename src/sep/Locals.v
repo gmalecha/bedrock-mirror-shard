@@ -1,8 +1,10 @@
 Require Import Ascii Bool String List.
-Require Import Word Memory SepExpr SymEval SepIL Env Prover SymEval IL SymIL.
+Require Import ExtLib.Tactics.Consider. 
+Require Import Word Memory SepExpr SymEval SepIL Env Prover SymEval IL SymIL ILEnv.
 Require Import sep.Array.
 Require Import Allocated.
 Require Import ListFacts.
+Require Import Arrays.
 
 Require Import MirrorShard.Expr.
 
@@ -81,6 +83,24 @@ Definition sel (vs : vals) (nm : string) : W := vs nm.
 Definition upd (vs : vals) (nm : string) (v : W) : vals := fun nm' =>
   if string_eq nm' nm then v else vs nm'.
 
+Theorem ascii_eq_correct : forall a b, ascii_eq a b = true -> a = b.
+Proof.
+  intros.
+  destruct a. destruct b.
+  simpl in H.
+  repeat match goal with 
+           | _ : context [ eqb ?A ?B ] |- _ =>
+             consider (Bool.eqb A B); intros; [ subst; simpl in * | discriminate ]
+         end.
+  eapply eqb_prop in H0. subst.
+  reflexivity.
+Qed.
+
+Definition bedrock_type_ascii : type :=
+  {| Impl := ascii
+   ; Eqb := ascii_eq
+   ; Eqb_correct := ascii_eq_correct |}.
+
 Definition bedrock_type_string : type :=
   {| Impl := string
    ; Eqb := string_eq
@@ -105,6 +125,8 @@ Definition types_r : Env.Repr type :=
       None ::
       (@Some type ILEnv.bedrock_type_nat) ::
       None ::
+      (@Some type ILEnv.bedrock_type_bool) ::
+      (@Some type bedrock_type_ascii) ::
       (@Some type bedrock_type_string) ::
       (@Some type bedrock_type_listString) ::
       (@Some type bedrock_type_vals) ::
@@ -115,9 +137,11 @@ Local Notation "'pcT'" := (tvType 0).
 Local Notation "'stT'" := (tvType 1).
 Local Notation "'wordT'" := (tvType 0).
 Local Notation "'natT'" := (tvType 4).
-Local Notation "'stringT'" := (tvType 6).
-Local Notation "'listStringT'" := (tvType 7).
-Local Notation "'valsT'" := (tvType 8).
+Local Notation "'boolT'" := (tvType 6).
+Local Notation "'asciiT'" := (tvType 7).
+Local Notation "'stringT'" := (tvType 8).
+Local Notation "'listStringT'" := (tvType 9).
+Local Notation "'valsT'" := (tvType 10).
 
 Definition badLocalVariable := O.
 Global Opaque badLocalVariable.
@@ -132,17 +156,47 @@ Fixpoint variablePosition (ns : list string) (nm : string) : nat :=
 Local Notation "'wplusF'" := 0.
 Local Notation "'wmultF'" := 2.
 Local Notation "'natToWF'" := 5.
-Local Notation "'nilF'" := 9.
-Local Notation "'consF'" := 10.
-Local Notation "'selF'" := 11.
-Local Notation "'updF'" := 12.
-Local Notation "'InF'" := 13.
-Local Notation "'variablePositionF'" := 14.
+Local Notation "'trueF'" := 11.
+Local Notation "'falseF'" := 12.
+Local Notation "'AsciiF'" := 13.
+Local Notation "'EmptyStringF'" := 14.
+Local Notation "'StringF'" := 15.
+Local Notation "'nilF'" := 16.
+Local Notation "'consF'" := 17.
+Local Notation "'selF'" := 18.
+Local Notation "'updF'" := 19.
+Local Notation "'InF'" := 20.
+Local Notation "'variablePositionF'" := 21.
 
 Section parametric.
   Variable types' : list type.
   Definition types := repr types_r types'.
-  Variable Prover : ProverT types.
+  Variable Prover : ProverT.
+
+  Definition true_r : signature types.
+    refine {| Domain := nil; Range := boolT |}.
+    exact true.
+  Defined.
+
+  Definition false_r : signature types.
+    refine {| Domain := nil; Range := boolT |}.
+    exact false.
+  Defined.
+
+  Definition Ascii_r : signature types.
+    refine {| Domain := boolT :: boolT :: boolT :: boolT :: boolT :: boolT :: boolT :: boolT :: nil; Range :=  asciiT |}.
+    exact Ascii.
+  Defined.
+
+  Definition EmptyString_r : signature types.
+    refine {| Domain := nil; Range := stringT |}.
+    exact EmptyString.
+  Defined.
+
+  Definition String_r : signature types.
+    refine {| Domain := asciiT :: stringT :: nil; Range := stringT |}.
+    exact String.
+  Defined.
 
   Definition nil_r : signature types.
     refine {| Domain := nil; Range := listStringT |}.
@@ -183,9 +237,16 @@ Section parametric.
         None ::
         None ::
         Some (ILEnv.natToW_r types) ::
+        Some (ILEnv.O_r types) ::
+        Some (ILEnv.S_r types) ::
         None ::
         None ::
         None ::
+        Some true_r ::
+        Some false_r ::
+        Some Ascii_r ::
+        Some EmptyString_r ::
+        Some String_r :: 
         Some nil_r ::
         Some cons_r ::
         Some sel_r ::
@@ -195,62 +256,187 @@ Section parametric.
         nil
       in Env.listOptToRepr lst (Default_signature _).
 
+  Section toConsts.
+    Variable funcs' : functions types.
+    Let funcs := repr funcs_r funcs'.
+
+    Definition toConst_bool (e : expr) : option bool :=
+      match e with
+        | Func trueF nil => Some true
+        | Func falseF nil => Some false
+        | _ => None
+      end.
+
+    Definition toExpr_bool (b : bool) : expr :=
+      match b with
+        | true => Func trueF nil
+        | false => Func falseF nil
+      end.
+
+    Theorem toConst_bool_sound : forall e,
+                                   match toConst_bool e with
+                                     | Some b => forall uvars vars, exprD funcs uvars vars e boolT = Some b
+                                     | None => True
+                                   end.
+    Proof.
+      destruct e; simpl; auto.
+      repeat ((destruct f; auto; [ ])).
+      destruct f. destruct l; reflexivity.
+      destruct f. destruct l; reflexivity.
+      auto.
+    Qed.
+
+    Theorem toExpr_bool_sound : forall b us vs, 
+                                  exprD funcs us vs (toExpr_bool b) boolT = Some b.
+    Proof.
+      destruct b; reflexivity.
+    Qed.
+
+    Definition toConst_ascii (e : expr) : option ascii :=
+      match e with
+        | Func AsciiF (a :: b :: c :: d :: e :: f :: g :: h :: nil) =>
+          match toConst_bool a , toConst_bool b , toConst_bool c , toConst_bool d , 
+                toConst_bool e , toConst_bool f , toConst_bool g , toConst_bool h with
+            | Some a , Some b , Some c , Some d , Some e , Some f , Some g , Some h =>
+              Some (Ascii a b c d e f g h)
+            | _ , _ , _ , _ , _ , _ , _ , _ => None
+          end
+        | _ => None
+      end.
+
+    Definition toExpr_ascii (a : ascii) : expr :=
+      match a with
+        | Ascii a b c d e f g h =>
+          Func AsciiF (toExpr_bool a :: toExpr_bool b :: toExpr_bool c :: toExpr_bool d ::
+                       toExpr_bool e :: toExpr_bool f :: toExpr_bool g :: toExpr_bool h :: nil)
+      end.
+
+    Theorem toExpr_ascii_sound : forall a us vs, 
+                                  exprD funcs us vs (toExpr_ascii a) asciiT = Some a.
+    Proof.
+      destruct a; simpl; intros. repeat rewrite toExpr_bool_sound. reflexivity.
+    Qed.
+
+    Theorem toConst_ascii_sound : forall e,
+                                   match toConst_ascii e with
+                                     | Some b => forall uvars vars, exprD funcs uvars vars e asciiT = Some b
+                                     | None => True
+                                   end.
+    Proof.
+      destruct e; simpl; auto.
+      repeat ((destruct f; auto; [ ])).
+      repeat ((destruct l; auto; [ ])).
+      simpl.
+      repeat match goal with
+               | H : _ |- _ => 
+                 rewrite H; clear H
+               | |- context [ toConst_bool ?e ] =>
+                 generalize (@toConst_bool_sound e); destruct (toConst_bool e); intros; auto
+             end.
+      reflexivity.
+    Qed.
+
+    Fixpoint toConst_string (e : expr) : option string :=
+      match e with
+        | Func EmptyStringF nil => Some EmptyString
+        | Func StringF (s :: ss :: nil) =>
+          match toConst_ascii s , toConst_string ss with
+            | Some s , Some ss => Some (String s ss)
+            | _ , _ => None
+            end
+        | _ => None
+      end.
+
+    Fixpoint toExpr_string (s : string) : expr :=
+      match s with
+        | EmptyString => Func EmptyStringF nil
+        | String s ss => Func StringF (toExpr_ascii s :: toExpr_string ss :: nil)
+      end.
+
+    Theorem toConst_string_sound : forall e,
+                                   match toConst_string e with
+                                     | Some b => forall uvars vars, exprD funcs uvars vars e stringT = Some b
+                                     | None => True
+                                   end.
+    Proof.
+      induction e; simpl; auto.
+      repeat ((destruct f; auto; [ ])).
+      destruct f. destruct l; auto.
+      destruct f; auto.      
+      repeat ((destruct l; auto; [ ])).
+      generalize (toConst_ascii_sound e). destruct (toConst_ascii e); intros; auto.
+      inversion H; clear H; subst.
+      inversion H4; clear H4; subst.      
+      destruct (toConst_string e0); intros; auto. 
+      simpl. rewrite H0. rewrite H2. reflexivity.
+    Qed.
+
+    Theorem toExpr_string_sound : forall s us vs, 
+                                  exprD funcs us vs (toExpr_string s) stringT = Some s.
+    Proof.
+      induction s; simpl; intros. reflexivity. rewrite toExpr_ascii_sound. rewrite IHs. reflexivity.
+    Qed.
+
+  End toConsts.
+
   Inductive deref_res :=
   | Nothing : deref_res
-  | Constant : expr types -> nat -> deref_res
-  | Symbolic : expr types -> expr types -> expr types -> deref_res.
+  | Constant : expr -> nat -> deref_res
+  | Symbolic : expr -> expr -> expr -> deref_res.
   (* Last one's args: base, variable list, and specific variable name *)
 
-  Definition deref (e : expr types) : deref_res :=
+  Definition deref (e : expr) : deref_res :=
     match e with
       | Func wplusF (base :: offset :: nil) =>
         match offset with
-          | Func natToWF (Const t k :: nil) =>
-            match t return tvarD types t -> _ with
-              | natT => fun k => match div4 k with
-                                   | None => Nothing
-                                   | Some k' => Constant base k'
-                                 end
-              | _ => fun _ => Nothing
-            end k
-
-          | Func natToWF (Func variablePositionF (xs :: x :: nil) :: nil) => Symbolic base xs x
-
+          | Func natToWF (k :: nil) =>
+            match toConst_nat k with
+              | None => 
+                match k with 
+                  | Func variablePositionF (xs :: x :: nil) => Symbolic base xs x
+                  | _ => Nothing
+                end
+              | Some k =>
+                match div4 k with
+                  | None => Nothing
+                  | Some k' => Constant base k'
+                end
+            end
           | _ => Nothing
         end
 
       | _ => Nothing
     end.
 
-  Fixpoint listIn (e : expr types) : option (list string) :=
+  Fixpoint listIn (e : expr) : option (list string) :=
     match e with
       | Func nilF nil => Some nil
-      | Func consF (Const tp s :: t :: nil) =>
-        match tp return tvarD types tp -> option (list string) with
-          | stringT => fun s => match listIn t with
-                                  | None => None
-                                  | Some t => Some (s :: t)
-                                end
-          | _ => fun _ => None
-        end s
+      | Func consF (s :: t :: nil) =>
+        match toConst_string s with
+          | Some s =>  match listIn t with
+                         | None => None
+                         | Some t => Some (s :: t)
+                       end
+          | _ => None
+        end 
       | _ => None
     end.
 
-  Fixpoint sym_sel (vs : expr types) (nm : string) : expr types :=
+  Fixpoint sym_sel (vs : expr) (nm : string) : expr :=
     match vs with
-      | Func updF (vs' :: Const tp nm' :: v :: nil) =>
-        match tp return tvarD types tp -> expr types with
-          | stringT => fun nm' =>
+      | Func updF (vs' :: nm' :: v :: nil) =>
+        match toConst_string nm' with
+          | Some nm' =>
             if string_eq nm' nm
               then v
               else sym_sel vs' nm
-          | _ => fun _ => Func selF (vs :: Const (types := types) (t := stringT) nm :: nil)
-        end nm'
-      | _ => Func selF (vs :: Const (types := types) (t := stringT) nm :: nil)
+          | None => Func selF (vs :: toExpr_string nm :: nil)
+        end
+      | _ => Func selF (vs :: toExpr_string nm :: nil)
     end.
 
-  Definition sym_read (summ : Prover.(Facts)) (args : list (expr types)) (p : expr types)
-    : option (expr types) :=
+  Definition sym_read (summ : Prover.(Facts)) (args : list (expr)) (p : expr)
+    : option (expr) :=
     match args with
       | ns :: vs :: _ :: p' :: nil =>
         match deref p with
@@ -276,8 +462,8 @@ Section parametric.
       | _ => None
     end.
 
-  Definition sym_write (summ : Prover.(Facts)) (args : list (expr types)) (p v : expr types)
-    : option (list (expr types)) :=
+  Definition sym_write (summ : Prover.(Facts)) (args : list expr) (p v : expr)
+    : option (list (expr)) :=
     match args with
       | ns :: vs :: avail :: p' :: nil =>
         match deref p with
@@ -290,7 +476,7 @@ Section parametric.
                   then match nth_error ns' offset with
                          | None => None
                          | Some nm => Some (ns
-                           :: Func updF (vs :: Const (types := types) (t := stringT) nm :: v :: nil)
+                           :: Func updF (vs :: toExpr_string nm :: v :: nil)
                            :: avail :: p' :: nil)
                        end
                   else None
@@ -308,8 +494,8 @@ Section parametric.
     end.
 End parametric.
 
-Definition MemEval types' : @MEVAL.PredEval.MemEvalPred (types types') :=
-  MEVAL.PredEval.Build_MemEvalPred (@sym_read _) (@sym_write _) (fun _ _ _ _ => None) (fun _ _ _ _ _ => None).
+Definition MemEval : MEVAL.PredEval.MemEvalPred :=
+  MEVAL.PredEval.Build_MemEvalPred sym_read sym_write (fun _ _ _ _ => None) (fun _ _ _ _ _ => None).
 
 Section correctness.
   Variable types' : list type.
@@ -329,14 +515,14 @@ Section correctness.
   Variable funcs' : functions types0.
   Definition funcs := Env.repr (funcs_r _) funcs'.
 
-  Variable Prover : ProverT types0.
+  Variable Prover : ProverT.
   Variable Prover_correct : ProverT_correct Prover funcs.
 
   Ltac doMatch P :=
     match P with
       | match ?E with 0 => _ | _ => _ end => destr2 idtac E
       | match ?E with nil => _ | _ => _ end => destr idtac E
-      | match ?E with Const _ _ => _ | _ => _ end => destr2 idtac E
+      | match ?E with Var _ => _ | _ => _ end => destr2 idtac E
       | match ?E with tvProp => _ | _ => _ end => destr idtac E
       | match ?E with None => _ | _ => _ end => destr idtac E
       | match ?E with left _ => _ | _ => _ end => destr2 idtac E
@@ -374,96 +560,113 @@ Section correctness.
   Proof.
     destruct e; simpl deref; intuition; try discriminate.
     deconstruct.
-    
-    match goal with
-      | [ |- context[div4 ?N] ] => specialize (div4_correct N);
-        destruct (div4 N)
-    end; intuition.
-    specialize (H0 _ (refl_equal _)); subst.
-    simpl in H.
-    deconstruct.
-    repeat (esplit || eassumption).
-    repeat f_equal.
-    unfold natToW.
-    f_equal.
-    omega.
-
-    simpl in H.
-    deconstruct.
-    destruct (exprD funcs uvars vars e0 listStringT); try discriminate.
-    destruct (exprD funcs uvars vars e1 stringT); try discriminate.
-    deconstruct; eauto 10.
+    consider (toConst_nat e0); intros.
+    { match goal with
+        | [ |- context[div4 ?N] ] => specialize (div4_correct N);
+                                    destruct (div4 N)
+      end; intuition.
+      specialize (H1 _ (refl_equal _)); subst.
+      simpl in H.
+      deconstruct.
+      eapply toConst_nat_sound with (us := uvars) (vs := vars) (ts' := types0) (fs' := funcs) in H0.
+      revert H0.
+      match goal with
+        | |- _ -> ?X =>
+          change (exprD funcs uvars vars e0 natT = Some (4 * n0) -> X)
+      end.
+      intro. rewrite H0 in *.
+      repeat (esplit || eassumption).
+      inversion H; clear H; subst.
+      repeat f_equal.
+      unfold natToW.
+      f_equal.
+      omega. }
+    { destruct e0; auto.
+      do 22 (destruct f; auto).
+      do 3 (destruct l; auto).
+      simpl in H.
+      deconstruct.
+      destruct (exprD funcs uvars vars e0 listStringT); try discriminate.
+      destruct (exprD funcs uvars vars e1 stringT); try discriminate.
+      deconstruct; eauto 10. }
   Qed.
 
   Lemma listIn_correct : forall uvars vars e ns, listIn e = Some ns
     -> exprD funcs uvars vars e listStringT = Some ns.
   Proof.
     induction e; simpl; intuition; try discriminate.
-    repeat match type of H with
-             | Forall _ (_ :: _ :: nil) => inversion H; clear H; subst
-             | _ => deconstruct'
-           end.
-    inversion H4; clear H4; subst.
-    clear H5.
-    deconstruct.
-    simpl in *.
-    erewrite H2; reflexivity.
+    do 17 (destruct f; try discriminate).
+    { destruct l; try discriminate. 
+      inversion H0; clear H0; subst. reflexivity. }
+    { destruct f; try discriminate.
+      do 3 (destruct l; try discriminate).
+      generalize (toConst_string_sound funcs e).
+      destruct (toConst_string e); try discriminate; intros.
+      specialize (H1 uvars vars). simpl.
+      inversion H; clear H; subst.
+      inversion H5; clear H5; subst.
+      clear H6.
+      consider (listIn e0); try discriminate; intros.
+      inversion H0; clear H0; subst.
+      specialize (H3 _ eq_refl).
+      rewrite H3.
+      cutrewrite (exprD funcs uvars vars e stringT = Some s).
+      reflexivity. eapply H1. }    
   Qed.
 
-  Lemma sym_sel_correct : forall uvars vars nm (vs : expr types0) vsv,
+  Lemma sym_sel_correct : forall uvars vars nm (vs : expr) vsv,
     exprD funcs uvars vars vs valsT = Some vsv
     -> exprD funcs uvars vars (sym_sel vs nm) wordT = Some (sel vsv nm).
   Proof.
     induction vs; simpl; intros; try discriminate.
+    { rewrite H. rewrite toExpr_string_sound with (funcs' := funcs). reflexivity. }
+    { rewrite H. rewrite toExpr_string_sound with (funcs' := funcs). reflexivity. }
 
-    destruct (equiv_dec t valsT); congruence.
-
-    rewrite H; reflexivity.
-
-    rewrite H; reflexivity.
-
-    Ltac t := simpl in *; try discriminate; try (deconstruct;
-      match goal with
-        | [ _ : Range (match ?E with nil => _ | _ => _ end) === _ |- _ ] =>
-          destruct E; simpl in *; try discriminate;
-            match goal with
-              | [ H : Range ?X === _ |- _ ] => destruct X; simpl in *; hnf in H; subst
-            end;
-            match goal with
-              | [ H : _ = _ |- _ ] => rewrite H; reflexivity
-            end
-      end).
-    simpl in *.
-  
-    do 13 (destruct f; t).
-
-    Focus 2.
-    deconstruct.
-    hnf in e; subst.
-    rewrite H0; reflexivity.
-
-    destruct l; simpl in *; try discriminate.
-    destruct l; simpl in *; try discriminate.
-    rewrite H0; reflexivity.
-    destruct e0; simpl in *; try (rewrite H0; reflexivity).
-    do 2 (destruct l; simpl in *; try (rewrite H0; reflexivity)).
-    destruct t; simpl in *; try (rewrite H0; reflexivity).
-    do 7 (destruct n; simpl in *; try (rewrite H0; reflexivity)).
-    inversion H; clear H; subst.
-    inversion H4; clear H4; subst.
-    inversion H5; clear H5; subst.
-    clear H6.
-    destruct (string_dec t0 nm); subst.
-    rewrite string_eq_true.
-    deconstruct.
-    unfold sel, upd.
-    rewrite string_eq_true; reflexivity.
-
-    rewrite string_eq_false by assumption.
-    deconstruct.
-    erewrite H3 by reflexivity.
-    f_equal; unfold sel, upd.
-    rewrite string_eq_false; auto.
+    { assert (exprD funcs uvars vars (Func 18 (Func f l :: toExpr_string nm :: nil)) wordT = Some (sel vsv nm)).
+      { simpl. 
+        destruct (nth_error funcs f); try discriminate; intros.
+        destruct (equiv_dec (Range s) valsT); try discriminate; intros.
+        unfold equiv in *; subst. destruct s; simpl in *. subst.
+        rewrite H0.
+        rewrite toExpr_string_sound with (funcs' := funcs). reflexivity. }
+      do 20 (destruct f; try assumption).
+      do 4 (destruct l; try assumption).
+      simpl in *.
+      repeat match goal with
+               | H : context [ match exprD funcs ?u ?v ?e ?t with _ => _ end ] |- _ =>
+                 consider (exprD funcs u v e t); intros; try discriminate
+               | H : Forall _ (_ :: _) |- _ => 
+                 inversion H; clear H; subst
+               | [ H : forall v, ?X = _ -> _ , H' : ?X = _ |- _ ] =>
+                 specialize (H _ H')
+               | H : Some _ = Some _ |- _ => inversion H; clear H; subst
+             end.
+      generalize (toConst_string_sound funcs e0).
+      destruct (toConst_string e0); intros.
+      { specialize (H uvars vars).
+        revert H.
+        match goal with
+          | |- _ -> ?X =>
+            change (exprD funcs uvars vars e0 stringT = Some s -> X)
+        end.
+        intro. rewrite H in *. inversion H1; clear H1; subst.
+        consider (string_eq t0 nm); intros.
+        { eapply string_eq_correct in H1. subst. rewrite H2.
+          f_equal. 
+          unfold sel, upd in *. rewrite H6.
+          rewrite toExpr_string_sound with (funcs' := funcs) in H4. inversion H4; clear H4; subst.
+          rewrite string_eq_true. reflexivity. }
+        { rewrite toExpr_string_sound with (funcs' := funcs) in H4.
+          inversion H4; clear H4; subst.
+          rewrite H8.
+          f_equal.
+          unfold sel, upd.
+          rewrite string_eq_false; auto. 
+          intro. subst. rewrite string_eq_true in H1. discriminate. } }
+      { simpl.
+        repeat match goal with
+                 | H : _ |- _ => rewrite H
+               end. reflexivity. } } 
   Qed.
 
   Require Import NArith Nomega.
@@ -570,7 +773,7 @@ Section correctness.
     Valid Prover_correct uvars vars summ ->
     exprD funcs uvars vars pe wordT = Some p ->
     match 
-      applyD (exprD funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
+      applyD types0 (exprD funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
       with
       | None => False
       | Some p => PropX.interp cs (p stn m)
@@ -766,13 +969,13 @@ Section correctness.
     exprD funcs uvars vars pe wordT = Some p ->
     exprD funcs uvars vars ve wordT = Some v ->
     match
-      applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
+      applyD types0 (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
       with
       | None => False
       | Some p => PropX.interp cs (p stn m)
     end ->
     match 
-      applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
+      applyD types0 (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
       with
       | None => False
       | Some pr => 
@@ -830,6 +1033,7 @@ Section correctness.
     destruct H7.
     destruct H3. unfold smem_write_word. rewrite H7.
     unfold locals.
+    rewrite toExpr_string_sound with (funcs' := funcs).
     apply simplify_bwd.
     exists x4; exists x1. split. apply H3.
     split. exists smem_emp. exists x4. split.
@@ -842,7 +1046,7 @@ Section correctness.
     erewrite array_updN in H9; eauto.
     apply nth_error_Some_length in Heq.
     apply array_bound in H9.
-    Require Import Arrays.
+
     rewrite updN_length in H9.
     rewrite length_toArray in H9.
     apply Nlt_in.
@@ -980,13 +1184,13 @@ Section correctness.
 
 End correctness.
 
-Definition MemEvaluator types' : MEVAL.MemEvaluator (types types') :=
+Definition MemEvaluator : MEVAL.MemEvaluator :=
   Eval cbv beta iota zeta delta [ MEVAL.PredEval.MemEvalPred_to_MemEvaluator ] in 
-    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ (MemEval types') 2.
+    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator MemEval 2.
 
 Theorem MemEvaluator_correct types' funcs' preds'
   : @MEVAL.MemEvaluator_correct (Env.repr types_r types') (tvType 0) (tvType 1) 
-  (MemEvaluator (Env.repr types_r types')) (funcs funcs') (Env.repr (ssig_r _) preds')
+  MemEvaluator (funcs funcs') (Env.repr (ssig_r _) preds')
   (IL.settings * IL.state) (tvType 0) (tvType 0)
   (@IL_mem_satisfies (types types')) (@IL_ReadWord (types types')) (@IL_WriteWord (types types'))
   (@IL_ReadByte (types types')) (@IL_WriteByte (types types')).
@@ -1008,7 +1212,7 @@ Definition pack : MEVAL.MemEvaluatorPackage types_r (tvType 0) (tvType 1) (tvTyp
   funcs_r
   (fun ts => Env.listOptToRepr (None :: None :: Some (ssig ts) :: nil)
     (SEP.Default_predicate (Env.repr types_r ts)))
-  (fun ts => MemEvaluator (types ts))
+  MemEvaluator
   (fun ts fs ps => @MemEvaluator_correct (types ts) _ _).
 
 
@@ -1027,10 +1231,6 @@ Theorem sel_upd_ne : forall vs nm v nm',
 Proof.
   unfold sel, upd; intros; subst; rewrite string_eq_false; auto.
 Qed.
-
-(*
-Require Import PropX.
-*)
 
 Ltac simp := cbv beta; unfold In.
 

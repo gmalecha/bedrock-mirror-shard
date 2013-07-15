@@ -22,7 +22,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
     Variable SymState : Type.
 
     Definition LearnHook : Type := 
-      forall P : ProverT types_, variables -> variables -> SymState -> Facts P -> list expr -> SymState * Quant.
+      forall P : ProverT, variables -> variables -> SymState -> Facts P -> list expr -> SymState * Quant.
 
     Variables pcT stT : tvar.
 
@@ -42,12 +42,12 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
   End LearnHook.
 
   Module LearnHookDefault.
-    Definition LearnHook_default (types : list type) (State : Type) : 
-      LearnHook types State :=
+    Definition LearnHook_default (State : Type) : 
+      LearnHook State :=
       fun _ _ _ x _ _ => (x, QBase).
     
     Definition LearnHook_default_correct types pcT stT State stateD funcs preds :
-      @LearnHook_correct types pcT stT State (@LearnHook_default _ _) stateD funcs preds.
+      @LearnHook_correct types pcT stT State (@LearnHook_default _) stateD funcs preds.
     Proof.
       unfold LearnHook_default; econstructor; intros; subst; auto.
       inversion H2. subst; simpl. auto.
@@ -63,14 +63,14 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
     Variables pcT stT : tvar. (** TODO: maybe we can get rid of this? **)
 
     Record MemEvaluator : Type :=
-    { sread_word : forall (P : ProverT types), Facts P -> 
+    { sread_word : forall (P : ProverT), Facts P -> 
       expr -> SH.SHeap -> option expr
-    ; swrite_word : forall (P : ProverT types), Facts P ->
+    ; swrite_word : forall (P : ProverT), Facts P ->
       expr -> expr -> SH.SHeap -> option SH.SHeap
 
-    ; sread_byte : forall (P : ProverT types), Facts P -> 
+    ; sread_byte : forall (P : ProverT), Facts P -> 
       expr -> SH.SHeap -> option expr
-    ; swrite_byte : forall (P : ProverT types), Facts P ->
+    ; swrite_byte : forall (P : ProverT), Facts P ->
       expr -> expr -> SH.SHeap -> option SH.SHeap
     }.
 
@@ -91,7 +91,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
 
     Record MemEvaluator_correct : Type :=
     { ReadCorrect :
-      forall (P : ProverT types) (PE : ProverT_correct P funcs),
+      forall (P : ProverT) (PE : ProverT_correct P funcs),
         forall facts pe ve SH,
           sread_word eval P facts pe SH = Some ve ->
           forall uvars vars cs p stn_m,
@@ -104,7 +104,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
               | _ => False
             end
     ; WriteCorrect :
-      forall (P : ProverT types) (PE : ProverT_correct P funcs),
+      forall (P : ProverT) (PE : ProverT_correct P funcs),
         forall uvars vars cs facts pe ve SH SH',
           swrite_word eval P facts pe ve SH = Some SH' ->
           Valid PE uvars vars facts ->
@@ -120,7 +120,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
             end
 
     ; ReadByteCorrect :
-      forall (P : ProverT types) (PE : ProverT_correct P funcs),
+      forall (P : ProverT) (PE : ProverT_correct P funcs),
         forall facts pe ve SH,
           sread_byte eval P facts pe SH = Some ve ->
           forall uvars vars cs p stn_m,
@@ -133,7 +133,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
               | _ => False
             end
     ; WriteByteCorrect :
-      forall (P : ProverT types) (PE : ProverT_correct P funcs),
+      forall (P : ProverT) (PE : ProverT_correct P funcs),
         forall uvars vars cs facts pe ve SH SH',
           swrite_byte eval P facts pe ve SH = Some SH' ->
           Valid PE uvars vars facts ->
@@ -161,9 +161,9 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
   { MemEvalTypes : Repr type
   ; MemEvalFuncs : forall ts, Repr (signature (repr tr (repr MemEvalTypes ts)))
   ; MemEvalPreds : forall ts, Repr (SEP.predicate (repr tr (repr MemEvalTypes ts)))
-  ; MemEval : forall ts, MemEvaluator (repr tr (repr MemEvalTypes ts))
+  ; MemEval : MemEvaluator
   ; MemEval_correct : forall ts fs ps, 
-    @MemEvaluator_correct (repr tr (repr MemEvalTypes ts)) pc st (MemEval ts)
+    @MemEvaluator_correct (repr tr (repr MemEvalTypes ts)) pc st MemEval
       (repr (MemEvalFuncs ts) fs) (repr (MemEvalPreds ts) ps)
       (tvarD (repr tr (repr MemEvalTypes ts)) st) ptr val
       (sat (repr MemEvalTypes ts)) (read (repr MemEvalTypes ts)) (write (repr MemEvalTypes ts))
@@ -174,7 +174,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
     Section with_prover.
       Variable types : list type.
       Variables pcT stT : tvar.
-      Variable prover : ProverT types.
+      Variable prover : ProverT.
       
       Definition smemeval_read_word_default (_ : Facts prover) (_ : expr)
         (_ : SH.SHeap) : option expr :=
@@ -186,7 +186,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
         None.
     End with_prover.
 
-    Definition MemEvaluator_default types : MemEvaluator types.
+    Definition MemEvaluator_default : MemEvaluator.
       constructor.
       apply smemeval_read_word_default.
       apply smemeval_write_word_default.
@@ -195,7 +195,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
     Defined.
 
     Theorem MemEvaluator_default_correct types' (pcT stT : tvar) funcs preds X Y Z A B C D E :
-      @MemEvaluator_correct types' pcT stT (MemEvaluator_default types') funcs preds X Y Z A B C D E.
+      @MemEvaluator_correct types' pcT stT MemEvaluator_default funcs preds X Y Z A B C D E.
       econstructor.
       simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; intros; exfalso; inversion H.
       simpl; unfold smemeval_read_word_default, smemeval_write_word_default; simpl; intros; exfalso; inversion H.
@@ -214,7 +214,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
       {| MemEvalTypes := nil_Repr EmptySet_type
        ; MemEvalFuncs := fun ts => nil_Repr (Default_signature _)
        ; MemEvalPreds := fun ts => nil_Repr (SEP.Default_predicate _)
-       ; MemEval := fun ts => MemEvaluator_default _
+       ; MemEval := MemEvaluator_default
        ; MemEval_correct := fun ts fs ps => MemEvaluator_default_correct _ _ _ _ _ _ _ _ _ _ _
        |}.
 
@@ -236,17 +236,17 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
 
       Record MemEvalPred : Type :=
       { pred_read_word  : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p : expr),
+        forall (P : ProverT) (facts : Facts P) (args : exprs) (p : expr),
           option expr
       ; pred_write_word : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p v : expr),
+        forall (P : ProverT) (facts : Facts P) (args : exprs) (p v : expr),
           option (exprs)
 
       ; pred_read_byte  : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p : expr),
+        forall (P : ProverT) (facts : Facts P) (args : exprs) (p : expr),
           option expr
       ; pred_write_byte : 
-        forall (P : ProverT types) (facts : Facts P) (args : exprs) (p v : expr),
+        forall (P : ProverT) (facts : Facts P) (args : exprs) (p v : expr),
           option (exprs)
       }.
 
@@ -415,24 +415,24 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
       Variable types : list type.
       Variables pcT stT : tvar.
       
-      Variable mep : MemEvalPred types.
+      Variable mep : MemEvalPred.
       Variable predIndex : nat.
 
-      Definition MemEvalPred_to_MemEvaluator : MemEvaluator types :=
-        {| sread_word := fun (P : ProverT types) (F : Facts P) (p : expr) (h : SH.SHeap) =>
+      Definition MemEvalPred_to_MemEvaluator : MemEvaluator :=
+        {| sread_word := fun (P : ProverT) (F : Facts P) (p : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
-             | Some argss => fold_args (fun args => @pred_read_word _ mep P F args p) argss
+             | Some argss => fold_args (fun args => @pred_read_word mep P F args p) argss
            end
-         ; swrite_word := fun (P : ProverT types) (F : Facts P) (p v : expr) (h : SH.SHeap) =>
+         ; swrite_word := fun (P : ProverT) (F : Facts P) (p v : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
              | Some argss =>
-               match fold_args_update (fun args => @pred_write_word _ mep P F args p v) argss with
+               match fold_args_update (fun args => @pred_write_word mep P F args p v) argss with
                  | None => None
                  | Some argss =>
                    Some {| SH.impures := FM.add predIndex argss impures
@@ -442,20 +442,20 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
                end
            end
 
-         ; sread_byte := fun (P : ProverT types) (F : Facts P) (p : expr) (h : SH.SHeap) =>
+         ; sread_byte := fun (P : ProverT) (F : Facts P) (p : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
-             | Some argss => fold_args (fun args => @pred_read_byte _ mep P F args p) argss
+             | Some argss => fold_args (fun args => @pred_read_byte mep P F args p) argss
            end
-         ; swrite_byte := fun (P : ProverT types) (F : Facts P) (p v : expr) (h : SH.SHeap) =>
+         ; swrite_byte := fun (P : ProverT) (F : Facts P) (p v : expr) (h : SH.SHeap) =>
            let impures := SH.impures h in
            let argss := FM.find predIndex impures in
            match argss with
              | None => None
              | Some argss =>
-               match fold_args_update (fun args => @pred_write_byte _ mep P F args p v) argss with
+               match fold_args_update (fun args => @pred_write_byte mep P F args p v) argss with
                  | None => None
                  | Some argss =>
                    Some {| SH.impures := FM.add predIndex argss impures
@@ -708,7 +708,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
       Variable types : list type.
       Variable pcT stT : tvar.
 
-      Definition MemEvaluator_composite (l r : MemEvaluator types) : MemEvaluator types :=
+      Definition MemEvaluator_composite (l r : MemEvaluator) : MemEvaluator :=
         {| sread_word := fun P f e h => 
            match sread_word l P f e h with
              | None => sread_word r P f e h
@@ -732,7 +732,7 @@ Module SymbolicEvaluator (ST : SepTheory) (SEP : SepExpr.SepExpr ST) (SH : SepHe
            end
          |}.
 
-      Variables evalL evalR : MemEvaluator types.
+      Variables evalL evalR : MemEvaluator.
 
       Variable funcs : functions types.
       Variable preds : SEP.predicates types.

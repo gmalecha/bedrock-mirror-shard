@@ -83,6 +83,13 @@ Definition bedrock_type_nat : type :=
    ; Expr.Eqb_correct := beq_nat_true
   |}.
 
+Definition bedrock_type_bool : type :=
+  {| Expr.Impl := bool
+   ; Expr.Eqb := Bool.eqb
+   ; Expr.Eqb_correct := Bool.eqb_prop
+  |}.
+
+
 Definition core_bedrock_types : list Expr.type :=
   bedrock_type_W ::
   bedrock_type_setting_X_state :: nil.

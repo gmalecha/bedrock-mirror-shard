@@ -15,10 +15,9 @@ Local Notation listWT := (tvType 5).
 
 Local Notation wltF := 4.
 Local Notation natToWF := 5.
-Local Notation lengthF := 6.
-Local Notation selF := 7.
-Local Notation updF := 8.
-
+Local Notation lengthF := 8.
+Local Notation selF := 9.
+Local Notation updF := 10.
 
 Section ArrayBoundProver.
   Variable types' : list type.
@@ -26,28 +25,28 @@ Section ArrayBoundProver.
   Variable funcs' : functions types.
   Definition funcs := Array.funcs funcs'.
 
-  Fixpoint deupd (e : expr types) : expr types :=
+  Fixpoint deupd (e : expr) : expr :=
     match e with
       | Func updF (e' :: _ :: _ :: nil) => deupd e'
       | _ => e
     end.
 
-  Definition factIn (e : expr types) : option (expr types * expr types) :=
+  Definition factIn (e : expr) : option (expr * expr) :=
     match e with
       | Func wltF (i :: Func natToWF (Func lengthF (a :: nil) :: nil) :: nil) =>
         Some (i, deupd a)
       | _ => None
     end.
 
-  Definition boundSummary := list (expr types * expr types).
+  Definition boundSummary := list (expr * expr).
 
-  Definition boundLearn1 (summ : boundSummary) (e : expr types) : boundSummary :=
+  Definition boundLearn1 (summ : boundSummary) (e : expr) : boundSummary :=
     match factIn e with
       | None => summ
       | Some fact => fact :: summ
     end.
 
-  Fixpoint boundLearn (summ : boundSummary) (es : list (expr types)) : boundSummary :=
+  Fixpoint boundLearn (summ : boundSummary) (es : list (expr)) : boundSummary :=
     match es with
       | nil => summ
       | e :: es => boundLearn1 (boundLearn summ es) e
@@ -55,21 +54,20 @@ Section ArrayBoundProver.
 
   Definition boundSummarize := boundLearn nil.
 
-  Fixpoint hypMatches (fact : expr types * expr types) (summ : boundSummary) : bool :=
+  Fixpoint hypMatches (fact : expr * expr) (summ : boundSummary) : bool :=
     match summ with
       | nil => false
       | (i, a) :: summ' => (expr_seq_dec i (fst fact) && expr_seq_dec a (snd fact)) || hypMatches fact summ'
     end.
 
-  Definition boundProve (summ : boundSummary) (goal : expr types) := 
+  Definition boundProve (summ : boundSummary) (goal : expr) := 
     match factIn goal with
       | None => false
       | Some fact => hypMatches fact summ
     end.
 
-  Fixpoint size (e : expr types) : nat :=
+  Fixpoint size (e : expr) : nat :=
     match e with
-      | Const _ _ => O
       | Var _ => O
       | UVar _ => O
       | Func _ es => fold_left plus (map size es) 1
@@ -82,7 +80,7 @@ Section ArrayBoundProver.
     specialize (IHls (n + a)); omega.
   Qed.
 
-  Lemma deupd_correct : forall uvars vars sz (e : expr types),
+  Lemma deupd_correct : forall uvars vars sz (e : expr),
     (size e <= sz)%nat
     -> match exprD funcs uvars vars e listWT with
          | None => True
@@ -111,11 +109,8 @@ Section ArrayBoundProver.
       destruct a; eauto.
     Qed.
 
-    do 8 (destruct f; [ t | ]).
+    do 10 (destruct f; [ t | ]).
     destruct f; [ | t ].
-
-    replace (nth_error funcs 8) with (Some (upd_r types'))
-      by (unfold funcs, Array.funcs; erewrite repr_nth_error; reflexivity).
     simpl.
     do 3 (destruct l; [ t | ]).
     destruct l; [ | t ].
@@ -137,7 +132,7 @@ Section ArrayBoundProver.
 
   Ltac duh := solve [ repeat duh' ].
 
-  Lemma factIn_correct : forall uvars vars (e : expr types),
+  Lemma factIn_correct : forall uvars vars (e : expr),
     match exprD funcs uvars vars e tvProp with
       | None => True
       | Some P => match factIn e with
@@ -148,6 +143,7 @@ Section ArrayBoundProver.
                           /\ (P = (iv < $(length av)))
                   end
     end.
+  Proof.
     destruct e; simpl factIn; simpl exprD; intuition; try duh.
     do 5 (destruct f; try duh).
     do 3 (destruct l; try duh).
@@ -164,7 +160,7 @@ Section ArrayBoundProver.
     do 6 (destruct f; auto).
     destruct l0; auto.
     destruct e0; auto.
-    do 7 (destruct f; auto).
+    do 9 (destruct f; auto).
     do 2 (destruct l1; auto).
     destruct l0; auto.
 
@@ -180,7 +176,7 @@ Section ArrayBoundProver.
     do 6 (destruct f; auto).
     destruct l; auto.
     destruct e0; auto.
-    do 7 (destruct f; auto).
+    do 9 (destruct f; auto).
     do 2 (destruct l0; auto).
     destruct l; auto.
     simpl in H0.
@@ -198,7 +194,7 @@ Section ArrayBoundProver.
   Section vars.
     Variables uvars vars : env types.
 
-    Definition pairValid (p : expr types * expr types) :=
+    Definition pairValid (p : expr * expr) :=
       exists i, exprD funcs uvars vars (fst p) wordT = Some i
         /\ exists a, exprD funcs uvars vars (snd p) listWT = Some a
           /\ i < $(length a).
@@ -257,6 +253,7 @@ Section ArrayBoundProver.
   Hint Resolve boundLearnCorrect boundSummarizeCorrect.
 
   Theorem boundProverCorrect : ProverCorrect funcs boundValid boundProve.
+  Proof.
     hnf; intros.
     unfold boundProve in H0.
     hnf.
@@ -294,7 +291,7 @@ Section ArrayBoundProver.
 
   Hint Resolve boundValid_weaken.
 
-  Definition boundProver : ProverT types :=
+  Definition boundProver : ProverT :=
     {| Facts := boundSummary
       ; Summarize := boundSummarize
       ; Learn := boundLearn

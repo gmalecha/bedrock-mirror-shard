@@ -26,24 +26,24 @@ Section typed.
 
   (** Symbolic registers **)
   Definition SymRegType : Type :=
-    (expr types * expr types * expr types)%type.
+    (expr * expr * expr)%type.
 
   (** Symbolic State **)
   Record SymState : Type :=
-  { SymMem   : option (SH.SHeap types)
+  { SymMem   : option SH.SHeap
   ; SymRegs  : SymRegType
-  ; SymPures : list (expr types)
+  ; SymPures : list expr
   }.
 
   (** Register accessor functions **)
-  Definition sym_getReg (r : reg) (sr : SymRegType) : expr types :=
+  Definition sym_getReg (r : reg) (sr : SymRegType) : expr :=
     match r with
       | Sp => fst (fst sr)
       | Rp => snd (fst sr)
       | Rv => snd sr
     end.
 
-  Definition sym_setReg (r : reg) (v : expr types) (sr : SymRegType) : SymRegType :=
+  Definition sym_setReg (r : reg) (v : expr) (sr : SymRegType) : SymRegType :=
     match r with
       | Sp => (v, snd (fst sr), snd sr)
       | Rp => (fst (fst sr), v, snd sr)
@@ -51,13 +51,13 @@ Section typed.
     end.
   
   (** These the reflected version of the IL, it essentially 
-   ** replaces all uses of W with expr types so that the value
+   ** replaces all uses of W with expr so that the value
    ** can be inspected.
    **)
   Inductive sym_loc :=
   | SymReg : reg -> sym_loc
-  | SymImm : expr types -> sym_loc
-  | SymIndir : reg -> expr types -> sym_loc.
+  | SymImm : expr -> sym_loc
+  | SymIndir : reg -> expr -> sym_loc.
 
   (* Valid targets of assignments *)
   Inductive sym_lvalue :=
@@ -68,7 +68,7 @@ Section typed.
   (* Operands *)
   Inductive sym_rvalue :=
   | SymRvLval : sym_lvalue -> sym_rvalue
-  | SymRvImm : expr types -> sym_rvalue
+  | SymRvImm : expr -> sym_rvalue
   | SymRvLabel : label -> sym_rvalue.
 
   (* Non-control-flow instructions *)
@@ -95,7 +95,7 @@ Section stateD.
   Variable funcs : functions TYPES.
   Variable sfuncs : SEP.predicates TYPES.
 
-  Definition stateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (ss : SymState TYPES) : Prop :=
+  Definition stateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (ss : SymState) : Prop :=
     let (stn,st) := stn_st in
     match ss with
       | {| SymMem := m ; SymRegs := (sp, rp, rv) ; SymPures := pures |} =>
@@ -119,7 +119,7 @@ Section stateD.
                                          end)
     end.
 
-  Definition qstateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (qs : Quantifier.Quant) (ss : SymState TYPES) : Prop :=
+  Definition qstateD (uvars vars : env TYPES) cs (stn_st : IL.settings * state) (qs : Quantifier.Quant) (ss : SymState) : Prop :=
     Quantifier.quantD vars uvars qs (fun vars_env meta_env => stateD meta_env vars_env cs stn_st ss).
 
 End stateD.
@@ -148,7 +148,7 @@ Section Denotations.
   Variable sfuncs : SEP.predicates TYPES.
   Variable uvars vars : env TYPES.
   
-  Definition sym_regsD (rs : SymRegType TYPES) : option regs :=
+  Definition sym_regsD (rs : SymRegType) : option regs :=
     match rs with
       | (sp, rp, rv) =>
         match 
@@ -167,7 +167,7 @@ Section Denotations.
         end
     end.
 
-  Definition sym_locD (s : sym_loc TYPES) : option loc :=
+  Definition sym_locD (s : sym_loc) : option loc :=
     match s with
       | SymReg r => Some (Reg r)
       | SymImm e =>
@@ -182,7 +182,7 @@ Section Denotations.
         end
     end.
 
-  Definition sym_lvalueD (s : sym_lvalue TYPES) : option lvalue :=
+  Definition sym_lvalueD (s : sym_lvalue) : option lvalue :=
     match s with
       | SymLvReg r => Some (LvReg r)
       | SymLvMem l => match sym_locD l with
@@ -195,7 +195,7 @@ Section Denotations.
                        end
     end.
 
-  Definition sym_rvalueD (r : sym_rvalue TYPES) : option rvalue :=
+  Definition sym_rvalueD (r : sym_rvalue) : option rvalue :=
     match r with
       | SymRvLval l => match sym_lvalueD l with
                          | Some l => Some (RvLval l)
@@ -208,7 +208,7 @@ Section Denotations.
       | SymRvLabel l => Some (RvLabel l)
     end.
 
-  Definition sym_instrD (i : sym_instr TYPES) : option instr :=
+  Definition sym_instrD (i : sym_instr) : option instr :=
     match i with
       | SymAssign l r =>
         match sym_lvalueD l , sym_rvalueD r with
@@ -222,7 +222,7 @@ Section Denotations.
         end
     end.
 
-  Fixpoint sym_instrsD (is : list (sym_instr TYPES)) : option (list instr) :=
+  Fixpoint sym_instrsD (is : list sym_instr) : option (list instr) :=
     match is with
       | nil => Some nil
       | i :: is => 
@@ -232,7 +232,7 @@ Section Denotations.
         end
     end.
 
-  Fixpoint istreamD (is : istream TYPES) (stn : settings) (st : state) (res : option state) : Prop :=
+  Fixpoint istreamD (is : istream) (stn : settings) (st : state) (res : option state) : Prop :=
     match is with
       | nil => Some st = res
       | inl (ins, st') :: is => 
@@ -261,21 +261,21 @@ Section Denotations.
     end.
 
   Section SymEvaluation.
-    Variable Prover : ProverT TYPES.
-    Variable meval : MEVAL.MemEvaluator TYPES.
+    Variable Prover : ProverT.
+    Variable meval : MEVAL.MemEvaluator.
 
     Section with_facts.
     Variable Facts : Facts Prover.
 
-    Definition sym_evalLoc (lv : sym_loc TYPES) (ss : SymState TYPES) : expr TYPES :=
+    Definition sym_evalLoc (lv : sym_loc) (ss : SymState) : expr :=
       match lv with
         | SymReg r => sym_getReg r (SymRegs ss)
         | SymImm l => l
         | SymIndir r w => fPlus (sym_getReg r (SymRegs ss)) w
       end.
 
-    Definition sym_evalLval (lv : sym_lvalue TYPES) (val : expr TYPES) (ss : SymState TYPES)
-      : option (SymState TYPES) :=
+    Definition sym_evalLval (lv : sym_lvalue) (val : expr) (ss : SymState)
+      : option (SymState) :=
       match lv with
         | SymLvReg r =>
           Some {| SymMem := SymMem ss 
@@ -312,7 +312,7 @@ Section Denotations.
             end
       end.
 
-    Definition sym_evalRval (rv : sym_rvalue TYPES) (ss : SymState TYPES) : option (expr TYPES) :=
+    Definition sym_evalRval (rv : sym_rvalue) (ss : SymState) : option expr :=
       match rv with
         | SymRvLval (SymLvReg r) =>
           Some (sym_getReg r (SymRegs ss))
@@ -338,8 +338,8 @@ Section Denotations.
         (*Some (Expr.Const (TYPES := TYPES) (t := tvType 2) l) *)
       end.
 
-    Definition sym_assertTest (l : sym_rvalue TYPES) (t : test) (r : sym_rvalue TYPES) (ss : SymState TYPES) (res : bool) 
-      : option (expr TYPES) :=
+    Definition sym_assertTest (l : sym_rvalue) (t : test) (r : sym_rvalue) (ss : SymState) (res : bool) 
+      : option expr :=
       let '(l, t, r) := 
         if res then (l, t, r)
         else match t with
@@ -360,7 +360,7 @@ Section Denotations.
         | _ , _ => None
       end.
 
-    Definition sym_evalInstr (i : sym_instr TYPES) (ss : SymState TYPES) : option (SymState TYPES) :=
+    Definition sym_evalInstr (i : sym_instr) (ss : SymState) : option (SymState) :=
       match i with 
         | SymAssign lv rv =>
           match sym_evalRval rv ss with
@@ -375,15 +375,15 @@ Section Denotations.
                   | Plus  => fPlus
                   | Minus => fMinus
                   | Times => fMult
-                end _ l r
-                in
-                sym_evalLval lv v ss
+                end l r
+              in
+              sym_evalLval lv v ss
             | _ , _ => None
           end
       end.
 
-    Fixpoint sym_evalInstrs (is : list (sym_instr TYPES)) (ss : SymState TYPES) 
-      : SymState TYPES + (SymState TYPES * list (sym_instr TYPES)) :=
+    Fixpoint sym_evalInstrs (is : list sym_instr) (ss : SymState) 
+      : SymState + (SymState * list sym_instr) :=
       match is with
         | nil => inl ss
         | i :: is =>
@@ -394,15 +394,15 @@ Section Denotations.
       end.
     End with_facts.
     
-    Variable learnHook : MEVAL.LearnHook TYPES (SymState TYPES).
+    Variable learnHook : MEVAL.LearnHook SymState.
 
     Inductive SymResult : Type :=
-    | Safe      : Quantifier.Quant -> SymState TYPES -> SymResult
+    | Safe      : Quantifier.Quant -> SymState -> SymResult
 (*    | Unsafe    : Quantifier.Quant -> SymResult *)
-    | SafeUntil : Quantifier.Quant -> SymState TYPES -> istream TYPES -> SymResult. 
+    | SafeUntil : Quantifier.Quant -> SymState -> istream -> SymResult. 
 
-    Fixpoint sym_evalStream (facts : Facts Prover) (is : istream TYPES) (qs : Quantifier.Quant) (u g : variables) 
-      (ss : SymState TYPES) : SymResult :=
+    Fixpoint sym_evalStream (facts : Facts Prover) (is : istream) (qs : Quantifier.Quant) (u g : variables) 
+      (ss : SymState) : SymResult :=
       match is with
         | nil => Safe qs ss
         | inl (ins, st) :: is =>
@@ -497,7 +497,7 @@ Section spec_functions.
     Local Notation "'ptrT'" := (tvType 0) (only parsing).
     Local Notation "'valT'" := (tvType 0) (only parsing).
 
-    Variable mep : MEVAL.PredEval.MemEvalPred types.
+    Variable mep : MEVAL.PredEval.MemEvalPred.
     Variable pred : SEP.predicate types.
     Variable funcs : functions types.
 
@@ -507,7 +507,7 @@ Section spec_functions.
         Valid PE uvars vars facts ->
         exprD funcs uvars vars pe ptrT = Some p ->
         match 
-          applyD (exprD funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
+          applyD types (exprD funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
           | Some p => PropX.interp cs (p stn st)
@@ -528,13 +528,13 @@ Section spec_functions.
         exprD funcs uvars vars pe ptrT = Some p ->
         exprD funcs uvars vars ve valT = Some v ->
         match
-          applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
+          applyD types (@exprD _ funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
           | Some p => PropX.interp cs (p stn st) (* ST.satisfies cs p stn st *)
         end ->
         match 
-          applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args' _ (SEP.SDenotation pred)
+          applyD types (@exprD _ funcs uvars vars) (SEP.SDomain pred) args' _ (SEP.SDenotation pred)
           with
           | None => False
           | Some pr => 
@@ -550,7 +550,7 @@ Section spec_functions.
         Valid PE uvars vars facts ->
         exprD funcs uvars vars pe ptrT = Some p ->
         match 
-          applyD (exprD funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
+          applyD types (exprD funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
           | Some p => PropX.interp cs (p stn st)
@@ -567,13 +567,13 @@ Section spec_functions.
         exprD funcs uvars vars pe ptrT = Some p ->
         exprD funcs uvars vars ve valT = Some v ->
         match
-          applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
+          applyD types (@exprD _ funcs uvars vars) (SEP.SDomain pred) args _ (SEP.SDenotation pred)
           with
           | None => False
           | Some p => PropX.interp cs (p stn st)
         end ->
         match 
-          applyD (@exprD _ funcs uvars vars) (SEP.SDomain pred) args' _ (SEP.SDenotation pred)
+          applyD types (@exprD _ funcs uvars vars) (SEP.SDomain pred) args' _ (SEP.SDenotation pred)
           with
           | None => False
           | Some pr => 
@@ -611,8 +611,8 @@ Section spec_functions.
         eapply read_pred_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
-          | [ H : applyD ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
-            change X with (applyD A B C D E); rewrite H
+          | [ H : applyD ?T ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
+            change X with (applyD T A B C D E); rewrite H
         end. eassumption.
 
         revert H; consider (exprD funcs uvars vars ve tvWord); intros; auto.
@@ -643,8 +643,8 @@ Section spec_functions.
         eapply write_pred_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
-          | [ H : applyD ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
-            change X with (applyD A B C D E); rewrite H
+          | [ H : applyD ?T ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
+            change X with (applyD T A B C D E); rewrite H
         end. eassumption.
         revert H.
         match goal with
@@ -805,8 +805,8 @@ Section spec_functions.
         eapply read_pred_byte_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
-          | [ H : applyD ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
-            change X with (applyD A B C D E); rewrite H
+          | [ H : applyD ?T ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
+            change X with (applyD T A B C D E); rewrite H
         end. eassumption.
 
         consider (smem_get p x); intros; auto; try tauto.
@@ -823,8 +823,8 @@ Section spec_functions.
         eapply write_pred_byte_correct in H; eauto.
         Focus 2. simpl in *.
         match goal with
-          | [ H : applyD ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
-            change X with (applyD A B C D E); rewrite H
+          | [ H : applyD ?T ?A ?B ?C ?D ?E = _ |- match ?X with _ => _ end ] =>
+            change X with (applyD T A B C D E); rewrite H
         end. eassumption.
         revert H.
         match goal with
@@ -862,7 +862,7 @@ Section spec_functions.
     Theorem MemPredEval_To_MemEvaluator_correct preds : 
       nth_error preds predIndex = Some pred ->
       @MEVAL.MemEvaluator_correct types pcT stT
-      (@MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ mep predIndex) funcs preds
+      (@MEVAL.PredEval.MemEvalPred_to_MemEvaluator mep predIndex) funcs preds
       (IL.settings * IL.state) (tvType 0) (tvType 0) IL_mem_satisfies
       IL_ReadWord IL_WriteWord IL_ReadByte IL_WriteByte.
     Proof.

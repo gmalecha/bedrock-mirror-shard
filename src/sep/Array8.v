@@ -84,7 +84,7 @@ Local Notation wtobF := 19.
 Section parametric.
   Variable types' : list type.
   Definition types := repr types_r types'.
-  Variable Prover : ProverT types.
+  Variable Prover : ProverT.
 
   Definition natToW_r : signature types.
     refine {| Domain := natT :: nil; Range := wordT |}.
@@ -142,14 +142,14 @@ Section parametric.
         nil
       in Env.listOptToRepr lst (Default_signature _).
 
-  Definition deref (e : expr types) : option (expr types * expr types) :=
+  Definition deref (e : expr) : option (expr * expr) :=
     match e with
       | Func wplusF (base :: offset :: nil) => Some (base, offset)
       | _ => None
     end.
 
-  Definition sym_read (summ : Prover.(Facts)) (args : list (expr types)) (p : expr types)
-    : option (expr types) :=
+  Definition sym_read (summ : Prover.(Facts)) (args : list expr) (p : expr)
+    : option expr :=
     match args with
       | bs :: p' :: nil =>
         match deref p with
@@ -164,8 +164,8 @@ Section parametric.
       | _ => None
     end.
 
-  Definition sym_write (summ : Prover.(Facts)) (args : list (expr types)) (p v : expr types)
-    : option (list (expr types)) :=
+  Definition sym_write (summ : Prover.(Facts)) (args : list expr) (p v : expr)
+    : option (list expr) :=
     match args with
       | bs :: p' :: nil =>
         match deref p with
@@ -181,7 +181,7 @@ Section parametric.
     end.
 End parametric.
 
-Definition MemEval types' : @MEVAL.PredEval.MemEvalPred (types types').
+Definition MemEval : @MEVAL.PredEval.MemEvalPred.
   apply MEVAL.PredEval.Build_MemEvalPred.
   exact (fun _ _ _ _ => None).
   exact (fun _ _ _ _ _ => None).
@@ -207,7 +207,7 @@ Section correctness.
   Variable funcs' : functions types0.
   Definition funcs := Env.repr (funcs_r _) funcs'.
 
-  Variable Prover : ProverT types0.
+  Variable Prover : ProverT.
   Variable Prover_correct : ProverT_correct Prover funcs.
 
   Lemma deref_correct : forall uvars vars e w base offset,
@@ -344,7 +344,7 @@ Section correctness.
       Valid PE uvars vars facts ->
       exprD funcs uvars vars pe wordT = Some p ->
       match 
-        applyD (exprD funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
+        applyD types0 (exprD funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
         with
         | None => False
         | Some p => PropX.interp cs (p stn st)
@@ -468,13 +468,13 @@ Section correctness.
       exprD funcs uvars vars pe wordT = Some p ->
       exprD funcs uvars vars ve wordT = Some v ->
       match
-        applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
+        applyD _ (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args _ (SEP.SDenotation ssig)
         with
         | None => False
         | Some p => PropX.interp cs (p stn st)
       end ->
       match 
-        applyD (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
+        applyD _ (@exprD _ funcs uvars vars) (SEP.SDomain ssig) args' _ (SEP.SDenotation ssig)
         with
         | None => False
         | Some pr => 
@@ -523,13 +523,13 @@ Section correctness.
   Qed.
 End correctness.
 
-Definition MemEvaluator types' : MEVAL.MemEvaluator (types types') :=
+Definition MemEvaluator : MEVAL.MemEvaluator :=
   Eval cbv beta iota zeta delta [ MEVAL.PredEval.MemEvalPred_to_MemEvaluator ] in 
-    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ (MemEval types') 3.
+    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator MemEval 3.
 
 Theorem MemEvaluator_correct types' funcs' preds'
   : @MEVAL.MemEvaluator_correct (Env.repr types_r types') (tvType 0) (tvType 1) 
-  (MemEvaluator (Env.repr types_r types')) (funcs funcs') (Env.repr (ssig_r _) preds')
+  MemEvaluator (funcs funcs') (Env.repr (ssig_r _) preds')
   (IL.settings * IL.state) (tvType 0) (tvType 0)
   (@IL_mem_satisfies (types types')) (@IL_ReadWord (types types')) (@IL_WriteWord (types types'))
   (@IL_ReadByte (types types')) (@IL_WriteByte (types types')).
@@ -551,5 +551,5 @@ Definition pack : MEVAL.MemEvaluatorPackage types_r (tvType 0) (tvType 1) (tvTyp
   funcs_r
   (fun ts => Env.listOptToRepr (None :: None :: None :: Some (ssig ts) :: nil)
     (SEP.Default_predicate (Env.repr types_r ts)))
-  (fun ts => MemEvaluator _)
+  MemEvaluator
   (fun ts fs ps => MemEvaluator_correct _ _).

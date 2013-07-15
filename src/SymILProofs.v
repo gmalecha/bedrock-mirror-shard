@@ -36,10 +36,10 @@ Module SymIL_Correct.
     Let funcs := repr (bedrock_funcs_r ts) fs.
     Variable preds : SEP.predicates types.
 
-    Variable Prover : ProverT types.
+    Variable Prover : ProverT.
     Variable PC : ProverT_correct Prover funcs.
 
-    Variable meval : MEVAL.MemEvaluator types.
+    Variable meval : MEVAL.MemEvaluator.
     Variable meval_correct : MEVAL.MemEvaluator_correct pcT stT meval funcs preds tvWord tvWord
       (@IL_mem_satisfies ts) (@IL_ReadWord ts) (@IL_WriteWord ts) (@IL_ReadByte ts) (@IL_WriteByte ts).
 
@@ -112,7 +112,7 @@ Module SymIL_Correct.
       Opaque stateD sym_locD.
       destruct rv; t_correct. 
       { destruct s; t_correct. 
-        { erewrite <- (@sym_evalLoc_correct (SymReg _ r)). f_equal. eauto. simpl.
+        { erewrite <- (@sym_evalLoc_correct (SymReg r)). f_equal. eauto. simpl.
           Transparent sym_locD. simpl. reflexivity. Opaque sym_locD. reflexivity. reflexivity. }
         { eapply (MEVAL.ReadCorrect meval_correct) with (cs := cs) in H2; eauto with sym_eval_hints.
           2: eapply sym_evalLoc_correct; (instantiate; eauto with sym_eval_hints). 2: eauto.
@@ -287,10 +287,10 @@ Module SymIL_Correct.
     Let funcs := repr (bedrock_funcs_r ts) fs.
     Variable preds : SEP.predicates types.
 
-    Variable Prover : ProverT types.
+    Variable Prover : ProverT.
     Variable PC : ProverT_correct Prover funcs.
 
-    Variable meval : MEVAL.MemEvaluator types.
+    Variable meval : MEVAL.MemEvaluator.
     Variable meval_correct : MEVAL.MemEvaluator_correct pcT stT meval funcs preds tvWord tvWord
       (@IL_mem_satisfies ts) (@IL_ReadWord ts) (@IL_WriteWord ts) (@IL_ReadByte ts) (@IL_WriteByte ts).
 
@@ -373,7 +373,7 @@ Module SymIL_Correct.
       Transparent stateD.
     Qed.
 
-    Variable learnHook : MEVAL.LearnHook types (SymState types).
+    Variable learnHook : MEVAL.LearnHook SymState.
     Variable learn_correct : @MEVAL.LearnHook_correct _ _ pcT stT learnHook (@stateD _ funcs preds) funcs preds.
 
     Ltac shatter_state ss :=

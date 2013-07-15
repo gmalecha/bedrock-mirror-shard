@@ -772,7 +772,7 @@ Section WordProver.
            end; auto.
   Qed.
   
-  Definition wordProver : ProverT types :=
+  Definition wordProver : ProverT :=
   {| Facts := word_summary
    ; Summarize := wordSummarize
    ; Learn := wordLearn

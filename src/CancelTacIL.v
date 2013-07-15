@@ -23,7 +23,7 @@ Section canceller.
   Variable ts : list Expr.type.
   Let types := Env.repr BedrockCoreEnv.core ts.
 
-  Definition nexistsSubst (not : Prop -> Prop) (types : list type) (funcs : functions types) (sub : SUBST.Subst types) :=
+  Definition nexistsSubst (not : Prop -> Prop) (types : list type) (funcs : functions types) (sub : SUBST.Subst) :=
     fix existsSubst (meta vars : env types) (from : nat) 
     (vals : list tvar) (ret : env types -> Prop) {struct vals} : Prop :=
     match vals with
@@ -56,7 +56,7 @@ Section canceller.
   Proof. reflexivity. Qed.
 
   Definition nSubst_equations_to (not : Prop -> Prop) (types : list type) (funcs : functions types) (uenv venv : env types)
-    (subst : SUBST.Subst types) from ls (rr : Prop) :=
+    (subst : SUBST.Subst) from ls (rr : Prop) :=
     (fix Subst_equations_to (from : nat) (ls : env types) {struct ls} : Prop :=
     match ls with
       | nil => rr
@@ -85,10 +85,10 @@ Section canceller.
     (ts : list Expr.type)
     (funcs : Expr.functions (Env.repr ILEnv.BedrockCoreEnv.core ts))
     (preds : SEP.predicates (Env.repr ILEnv.BedrockCoreEnv.core ts))
-    (algos : TacPackIL.ILAlgoTypes.AllAlgos (Env.repr ILEnv.BedrockCoreEnv.core ts))
+    (algos : TacPackIL.ILAlgoTypes.AllAlgos)
     (uvars : Expr.env (Env.repr ILEnv.BedrockCoreEnv.core ts))
-    (lhs rhs : SEP.sexpr (Env.repr ILEnv.BedrockCoreEnv.core ts))
-    (hyps : Expr.exprs (Env.repr ILEnv.BedrockCoreEnv.core ts)) : Prop :=
+    (lhs rhs : SEP.sexpr)
+    (hyps : Expr.exprs) : Prop :=
     let types := Env.repr ILEnv.BedrockCoreEnv.core ts in
     let hints :=
       match TacPackIL.ILAlgoTypes.Hints algos with
@@ -101,7 +101,7 @@ Section canceller.
       match TacPackIL.ILAlgoTypes.Prover algos with
         | Some x => x
         | None =>
-          Provers.trivialProver (Env.repr ILEnv.BedrockCoreEnv.core ts)
+          Provers.trivialProver
       end in
     let tfuncs := typeof_funcs funcs in
     let tpreds := SEP.typeof_preds preds in
@@ -143,12 +143,11 @@ Section canceller.
   Theorem ApplyCancelSep_slice (boundf boundb : nat) : forall (ts : list Expr.type)
       (funcs : Expr.functions (Env.repr ILEnv.BedrockCoreEnv.core ts))
       (preds : SEP.predicates (Env.repr ILEnv.BedrockCoreEnv.core ts))
-      (algos : TacPackIL.ILAlgoTypes.AllAlgos
-        (Env.repr ILEnv.BedrockCoreEnv.core ts)),
+      (algos : TacPackIL.ILAlgoTypes.AllAlgos),
       TacPackIL.ILAlgoTypes.AllAlgos_correct (types := Env.repr ILEnv.BedrockCoreEnv.core ts) funcs preds algos ->
       forall (uvars : Expr.env (Env.repr ILEnv.BedrockCoreEnv.core ts))
-        (lhs rhs : SEP.sexpr (Env.repr ILEnv.BedrockCoreEnv.core ts))
-        (hyps : Expr.exprs (Env.repr ILEnv.BedrockCoreEnv.core ts)),
+        (lhs rhs : SEP.sexpr)
+        (hyps : Expr.exprs),
         Expr.AllProvable funcs uvars nil hyps ->
         (cancel himp emp star ex inj not boundf boundb funcs preds algos uvars lhs rhs hyps) ->
         SEP.himp funcs preds uvars nil lhs rhs.
@@ -169,7 +168,7 @@ Section canceller.
               end)
            match ILAlgoTypes.Prover algos with
            | Some x => x
-           | None => trivialProver (Env.repr BedrockCoreEnv.core ts0)
+           | None => trivialProver
            end boundf boundb (typeof_env uvars) hyps lhs rhs); intros.
     { eapply CANCEL_TAC.ApplyCancelSep_with_eq in H1; eauto. 
       { destruct X. destruct (ILAlgoTypes.Hints algos); eauto using UNF.ForwardOk.

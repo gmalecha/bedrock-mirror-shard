@@ -25,24 +25,24 @@ Module BedrockPtsToEvaluator.
 
     Section parametric.
       Variable types : list type.
-      Variable Prover : ProverT types.
+      Variable Prover : ProverT.
 
       Definition psummary := Facts Prover.
 
-      Definition expr_equal (sum : psummary) (tv : tvar) (a b : expr types) : bool :=
+      Definition expr_equal (sum : psummary) (tv : tvar) (a b : expr) : bool :=
         if Expr.expr_seq_dec a b
         then true 
         else Prove Prover sum (Equal tv a b).
     
-      Definition sym_read_word_ptsto32 (summ : psummary) (args : list (expr types)) (p : expr types) 
-        : option (expr types) :=
+      Definition sym_read_word_ptsto32 (summ : psummary) (args : list expr) (p : expr) 
+        : option expr :=
         match args with
           | p' :: v' :: nil => 
             if expr_equal summ ptrT p p' then Some v' else None
           | _ => None
         end.
-      Definition sym_write_word_ptsto32 (summ : psummary) (args : list (expr types)) (p v : expr types)
-        : option (list (expr types)) :=
+      Definition sym_write_word_ptsto32 (summ : psummary) (args : list expr) (p v : expr)
+        : option (list expr) :=
         match args with
           | p' :: v' :: nil =>
             if expr_equal summ ptrT p p' then Some (p :: v :: nil) else None
@@ -50,7 +50,7 @@ Module BedrockPtsToEvaluator.
         end.
   End parametric.
 
-  Definition MemEval_ptsto32 types : @MEVAL.PredEval.MemEvalPred types.
+  Definition MemEval_ptsto32 : @MEVAL.PredEval.MemEvalPred.
     apply MEVAL.PredEval.Build_MemEvalPred.
     apply sym_read_word_ptsto32.
     apply sym_write_word_ptsto32.
@@ -79,11 +79,11 @@ Module BedrockPtsToEvaluator.
       in Env.listToRepr lst (SEP.Default_predicate _).
 
     Variable funcs : functions types.
-    Variable Prover : ProverT types.
+    Variable Prover : ProverT.
     Variable Prover_correct : ProverT_correct Prover funcs.
 
     Theorem expr_equal_correct : 
-      forall (sum : Facts Prover) (tv : tvar) (a b : expr types),
+      forall (sum : Facts Prover) (tv : tvar) (a b : expr),
         expr_equal Prover sum tv a b = true ->
         forall uvars vars l r,
           exprD funcs uvars vars a tv = Some l ->
@@ -101,7 +101,7 @@ Module BedrockPtsToEvaluator.
     Ltac expose :=
       repeat (
         match goal with 
-          | [ H : match applyD _ _ ?A _ _ with
+          | [ H : match applyD _ _ _ ?A _ _ with
                     | Some _ => _ 
                     | None => False 
                   end |- _ ] =>
@@ -134,7 +134,7 @@ Module BedrockPtsToEvaluator.
       Valid Prover_correct uvars vars summ ->
       exprD funcs uvars vars pe ptrT = Some p ->
       match 
-        applyD (exprD funcs uvars vars) (SEP.SDomain ptsto32_ssig) args _ (SEP.SDenotation ptsto32_ssig)
+        applyD types (exprD funcs uvars vars) (SEP.SDomain ptsto32_ssig) args _ (SEP.SDenotation ptsto32_ssig)
         with
         | None => False
         | Some p => PropX.interp cs (p stn m)
@@ -165,13 +165,13 @@ Module BedrockPtsToEvaluator.
       exprD funcs uvars vars pe ptrT = Some p ->
       exprD funcs uvars vars ve wordT = Some v ->
       match
-        applyD (@exprD _ funcs uvars vars) (SEP.SDomain ptsto32_ssig) args _ (SEP.SDenotation ptsto32_ssig)
+        applyD types (@exprD _ funcs uvars vars) (SEP.SDomain ptsto32_ssig) args _ (SEP.SDenotation ptsto32_ssig)
         with
         | None => False
         | Some p => PropX.interp cs (p stn m)
       end ->
       match 
-        applyD (@exprD _ funcs uvars vars) (SEP.SDomain ptsto32_ssig) args' _ (SEP.SDenotation ptsto32_ssig)
+        applyD types (@exprD _ funcs uvars vars) (SEP.SDomain ptsto32_ssig) args' _ (SEP.SDenotation ptsto32_ssig)
         with
         | None => False
         | Some pr => 
@@ -181,7 +181,7 @@ Module BedrockPtsToEvaluator.
           end
       end.
     Proof.
-      simpl; intros; expose.
+      simpl; intros. expose.
       revert H; consider (expr_equal Prover summ ptrT pe e); intros; try congruence.
       inversion H6; clear H6; subst. simpl.
       rewrite H1. rewrite H2.
@@ -242,13 +242,13 @@ Module BedrockPtsToEvaluator.
     Qed.
   End correctness.
 
-  Definition MemEvaluator_ptsto32 types' : MEVAL.MemEvaluator types' :=
+  Definition MemEvaluator_ptsto32 : MEVAL.MemEvaluator :=
     Eval cbv beta iota zeta delta [ MEVAL.PredEval.MemEvalPred_to_MemEvaluator ] in 
-    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator _ (MemEval_ptsto32 types') 0.
+    @MEVAL.PredEval.MemEvalPred_to_MemEvaluator MemEval_ptsto32 0.
 
   Theorem MemEvaluator_ptsto32_correct types' funcs' preds'
     : @MEVAL.MemEvaluator_correct (Env.repr ptsto32_types_r types') (tvType 0) (tvType 1) 
-    (MemEvaluator_ptsto32 (Env.repr ptsto32_types_r types')) funcs' (Env.repr (ptsto32_ssig_r _) preds')
+    (MemEvaluator_ptsto32) funcs' (Env.repr (ptsto32_ssig_r _) preds')
     (IL.settings * IL.state) (tvType 0) (tvType 0) (@IL_mem_satisfies types')
     (@IL_ReadWord types') (@IL_WriteWord types') (@IL_ReadByte types') (@IL_WriteByte types').
   Proof.
@@ -271,7 +271,7 @@ Module BedrockPtsToEvaluator.
       (fun ts => Env.nil_Repr (Default_signature (Env.repr ptsto32_types_r ts)))
       (fun ts => Env.listToRepr (ptsto32_ssig ts :: nil)
         (SEP.Default_predicate (Env.repr ptsto32_types_r ts)))
-      (fun ts => MemEvaluator_ptsto32 _)
+      (MemEvaluator_ptsto32)
       (fun ts fs ps => MemEvaluator_ptsto32_correct _ _).
 
 End BedrockPtsToEvaluator.
