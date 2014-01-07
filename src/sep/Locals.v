@@ -591,8 +591,8 @@ Section correctness.
       repeat match goal with
                | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
                  match goal with
-                   | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                   | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                   | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                   | _ => specialize (@Prove_correct _ _ _ Prover_correct _ _ summ H goal); intro
                  end
              end; unfold ValidProp in *.
       unfold types0 in *.
@@ -614,11 +614,12 @@ Section correctness.
       case_eq (exprD funcs uvars vars e1 natT); [ intros ? Heq' | intro Heq' ]; rewrite Heq' in *; try tauto.
       case_eq (exprD funcs uvars vars e2 wordT); [ intros ? Heq'' | intro Heq'' ]; rewrite Heq'' in *; try tauto.
       rewrite H in H4.
-      specialize (H4 (ex_intro _ _ (refl_equal _))).
-      hnf in H4; simpl in H4.
+      subst.
+(*      specialize (H4 (ex_intro _ _ (refl_equal _))).
+      hnf in H2; simpl in H2.
       rewrite Heq'' in H4.
       rewrite H in H4.
-      subst.
+      subst. *)
       Require Import PropXTac.
       apply simplify_fwd in H2.
       destruct H2 as [ ? [ ? [ ? [ ] ] ] ].
@@ -670,8 +671,8 @@ Section correctness.
     { repeat match goal with
                | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
                  match goal with
-                   | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                   | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                   | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                   | _ => specialize (@Prove_correct _ _ _  Prover_correct _ _ summ H goal); intro
                  end
              end; unfold ValidProp in *.
       unfold types0 in *.
@@ -688,17 +689,14 @@ Section correctness.
       rewrite H10 in *.
       rewrite H5 in *.
       rewrite H11 in *.
-      specialize (H4 (ex_intro _ _ (refl_equal _))).
-      unfold Provable in H4.
+(*      specialize (H4 (ex_intro _ _ (refl_equal _))).
+      unfold Provable in H4. *)
       injection H; clear H; intros; subst.
       simpl exprD in *.
       unfold types0 in *.
-      unfold Provable in *.
       simpl exprD in *.
       deconstruct.
-      rewrite H10 in *.
-      specialize (H3 (ex_intro _ _ (refl_equal _))).
-      specialize (H9 (ex_intro _ _ (refl_equal _))).
+      rewrite H11 in *.
       subst.
       apply simplify_fwd in H2.
       destruct H2.
@@ -711,7 +709,8 @@ Section correctness.
       destruct H5.
       simpl in H.
       simpl in H2.
-      simpl in H5.
+      simpl in H9.
+      destruct H9.
       destruct H5.
       subst.
       eapply split_emp in H2. red in H2; subst.
@@ -792,8 +791,8 @@ Section correctness.
     repeat match goal with
              | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
                match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                 | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                 | _ => specialize (@Prove_correct _ _ _ Prover_correct _ _ summ H goal); intro
                end
            end; unfold ValidProp in *.
     unfold types0 in *.
@@ -813,7 +812,8 @@ Section correctness.
     destruct (exprD funcs uvars vars e1 natT); try tauto.
     destruct (exprD funcs uvars vars e2 wordT); try tauto.
     rewrite H2.
-    specialize (H6 (ex_intro _ _ (refl_equal _))); subst.
+(*    specialize (H6 (ex_intro _ _ (refl_equal _))); subst. *)
+    subst.
     apply simplify_fwd in H3.
     destruct H3 as [ ? [ ? [ ? [ ] ] ] ].
     destruct H3 as [ ? [ ? [ ? [ ] ] ] ].
@@ -877,8 +877,8 @@ Section correctness.
       repeat match goal with
                | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
                  match goal with
-                   | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                   | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                   | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                   | _ => specialize (@Prove_correct _ _ _ Prover_correct _ _ summ H goal); intro
                  end
              end; unfold ValidProp in *.
       unfold types0 in *.
@@ -910,20 +910,21 @@ Section correctness.
       destruct H3.
       destruct H3.
       simpl in H3.
-      destruct H9.
-      simpl in H9.
-      destruct H9.
-      apply simplify_bwd in H13.
+      destruct H5.
+      simpl in H5.
+      destruct H5.
+      subst.
+      apply simplify_bwd in H6.
       subst.
       eapply split_emp in H3. red in H3; subst.
-      eapply smem_write_correct' in H13.
-      destruct H13 as [ ? [ ] ].
+      eapply smem_write_correct' in H6.
+      destruct H6 as [ ? [ ] ].
       rewrite <- variablePosition'_4.
       rewrite natToW_times4.
       rewrite wmult_comm.
       eapply MSMF.split_multi_write in H3. 2: eassumption.
       destruct H3. destruct H3.
-      unfold smem_write_word. rewrite H14.
+      unfold smem_write_word. rewrite H7.
       apply simplify_bwd.
       esplit.
       esplit.
@@ -938,18 +939,18 @@ Section correctness.
       2: split; simpl; eauto.
       eapply split_emp. reflexivity.
       apply simplify_fwd.
-      unfold Array.upd in H13.
-      rewrite wordToNat_natToWord_idempotent in H13.
+      unfold Array.upd in H6.
+      rewrite wordToNat_natToWord_idempotent in H6.
       
       rewrite array_updN_variablePosition'; auto.
 
-      apply array_bound in H13.
-      rewrite updN_length in H13.
+      apply array_bound in H6.
+      rewrite updN_length in H6.
       apply Nlt_in.
       rewrite Npow2_nat.
       repeat rewrite Nat2N.id.
       apply variablePosition'_length in H8.
-      rewrite length_toArray in H13.
+      rewrite length_toArray in H6.
       omega.
 
       assumption.
@@ -961,20 +962,20 @@ Section correctness.
       rewrite wordToNat_natToWord_idempotent.
       rewrite wordToNat_natToWord_idempotent.
       apply variablePosition'_length; auto.
-      apply array_bound in H13.
+      apply array_bound in H6.
       apply Nlt_in.
       rewrite Npow2_nat.
       repeat rewrite Nat2N.id.
-      rewrite length_toArray in H13.
+      rewrite length_toArray in H6.
       assumption.
 
       apply Nlt_in.
       rewrite Npow2_nat.
       repeat rewrite wordToN_nat.
       repeat rewrite Nat2N.id.
-      apply array_bound in H13.
+      apply array_bound in H6.
       generalize (variablePosition'_length _ _ H8).
-      rewrite length_toArray in H13.
+      rewrite length_toArray in H6.
       omega. }
   Qed.
 

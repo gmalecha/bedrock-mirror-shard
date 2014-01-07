@@ -1,10 +1,9 @@
-Require Import Arith NArith Eqdep_dec List.
+Require Import Arith NArith Eqdep_dec Coq.Lists.List.
 Require Import ExtLib.Data.HList.
 Require Import ExtLib.Tactics.Consider.
-Require Import ExtLib.Data.Lists. 
+Require Import ExtLib.Data.List.
 Require Import MirrorShard.Heaps.
 Require Import MirrorShard.MultiMem.
-Require Import ListFacts.
 Require Import Nomega Word Memory PropX PropXTac IL SepTheoryPropX.
 
 Set Implicit Arguments.
@@ -609,7 +608,9 @@ Proof.
     erewrite IHs2; eauto. }
   { eapply STK.interp_ex in H. destruct H.
     eapply IHs in H. simpl in *. auto. }
-  { unfold SEP.typeof_preds. rewrite map_nth_error_full. destruct (nth_error preds f).
+  { unfold SEP.typeof_preds. 
+    rewrite ListNth.nth_error_map.
+    destruct (nth_error preds f).
     { destruct p; simpl in *. generalize dependent SDomain. clear. induction l; destruct SDomain; simpl; intros; auto.
       eapply STK.interp_pure in H. unfold SepExpr.BadPredApply in *. intuition. PropXTac.propxFo.
       consider (Expr.exprD funcs uvars vars a t); intros.

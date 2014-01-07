@@ -257,6 +257,8 @@ Section ArrayBoundProver.
   Hint Resolve boundLearnCorrect boundSummarizeCorrect.
 
   Theorem boundProverCorrect : ProverCorrect funcs boundValid boundProve.
+  Proof.
+    eapply ProverCorrect_ProverCorrect'.
     hnf; intros.
     unfold boundProve in H0.
     hnf.

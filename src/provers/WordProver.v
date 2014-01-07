@@ -669,6 +669,7 @@ Section WordProver.
 
   Theorem wordProverCorrect : ProverCorrect funcs wordValid wordProve.
   Proof.
+    eapply ProverCorrect_ProverCorrect'.
     hnf; intros.
     destruct H.
     destruct goal; simpl in *; try discriminate.

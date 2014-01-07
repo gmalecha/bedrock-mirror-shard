@@ -362,8 +362,8 @@ Section correctness.
     repeat match goal with
              | [ H : Valid _ _ _ _, _ : context[Prove P ?summ ?goal] |- _ ] =>
                match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct PE summ H (goal := goal)); intro
+                 | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                 | _ => specialize (@Prove_correct _ _ _ PE _ _ summ H goal); intro
                end
            end; unfold ValidProp in *; simpl in *.
 
@@ -381,15 +381,12 @@ Section correctness.
     subst.
     rewrite H4 in *.
     rewrite H7 in *.
-    specialize (H6 (ex_intro _ _ (refl_equal _))).
-    specialize (H3 (ex_intro _ _ (refl_equal _))); subst.
-    red in H2.
-
+    subst.
     eapply sym_read_correct' in H2; eauto.
     rewrite H2; reflexivity.
   Qed.
 
-  Opaque natToWord. 
+  Opaque natToWord.
   Lemma sym_write_correct'' : forall specs stn v bs p i st,
     (i < length bs)%nat
     -> interp specs (array8 bs p stn st)
@@ -492,8 +489,8 @@ Section correctness.
     repeat match goal with
              | [ H : Valid _ _ _ _, _ : context[Prove P ?summ ?goal] |- _ ] =>
                match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct PE summ H (goal := goal)); intro
+                 | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                 | _ => specialize (@Prove_correct _ _ _ PE _ _ summ H goal); intro
                end
            end; unfold ValidProp in *; simpl in *.
 
@@ -513,10 +510,7 @@ Section correctness.
     simpl in *.
     rewrite H8 in *.
     rewrite H5 in *.
-    specialize (H7 (ex_intro _ _ (refl_equal _))).
-    specialize (H4 (ex_intro _ _ (refl_equal _))); subst.
-    red in H3.
-
+    subst.
     eapply sym_write_correct' in H3; eauto.
     destruct H3; intuition.
     rewrite H7; assumption.

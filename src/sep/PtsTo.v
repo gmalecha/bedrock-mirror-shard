@@ -95,7 +95,7 @@ Module BedrockPtsToEvaluator.
       rewrite H1 in H0; inversion H0; auto.
       generalize (Prove_correct Prover_correct). intro XX; eapply XX in H; eauto; clear XX.
       unfold Provable, ValidProp in *. simpl in *.
-      rewrite H0 in H. rewrite H1 in H. apply H. eauto.
+      rewrite H0 in H. rewrite H1 in H. apply H.
     Qed.
 
     Ltac expose :=

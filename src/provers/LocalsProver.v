@@ -57,6 +57,8 @@ Section LocalsProver.
   Qed.
 
   Theorem localsProveCorrect : ProverCorrect funcs reflexivityValid localsProve.
+  Proof.
+    apply ProverCorrect_ProverCorrect'.
     unfold localsProve; hnf; simpl; intros.
 
     destruct goal; try discriminate.

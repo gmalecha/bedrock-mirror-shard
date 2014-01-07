@@ -556,11 +556,11 @@ Section correctness.
     generalize (deref_correct uvars vars pe); destr ltac:(simpl in *) (deref pe); intro Hderef.
     destruct p0.
 
-    repeat match goal with
+    repeat  match goal with
              | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
                match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                 | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                 | _ => specialize (@Prove_correct _ _ _ Prover_correct _ _ summ H goal); intro
                end
            end; unfold ValidProp in *; simpl in *.
 
@@ -579,16 +579,14 @@ Section correctness.
     simpl in *.
     rewrite H4 in *.
     rewrite H7 in *.
-    specialize (H6 (ex_intro _ _ (refl_equal _))).
-    specialize (H3 (ex_intro _ _ (refl_equal _))); subst.
-    red in H2.
-
+    subst.
     eapply smem_read_correct'; eauto.
   Qed.
 
   Theorem ptsto32m'_out : forall a cs stn vs offset m,
     interp cs (ptsto32m' _ a offset vs stn m)
     -> interp cs (ptsto32m _ a offset vs stn m).
+  Proof.
     induction vs.
 
     auto.
@@ -805,11 +803,11 @@ Section correctness.
     generalize (deref_correct uvars vars pe); destr ltac:(simpl in *) (deref pe); intro Hderef.
     destruct p0.
 
-    repeat match goal with
+    repeat  match goal with
              | [ H : Valid _ _ _ _, _ : context[Prove Prover ?summ ?goal] |- _ ] =>
                match goal with
-                 | [ _ : context[ValidProp _ _ _ goal] |- _ ] => fail 1
-                 | _ => specialize (Prove_correct Prover_correct summ H (goal := goal)); intro
+                 | [ _ : context[exprD _ _ _ goal _] |- _ ] => fail 1
+                 | _ => specialize (@Prove_correct _ _ _ Prover_correct _ _ summ H goal); intro
                end
            end; unfold ValidProp in *; simpl in *.
 
@@ -829,13 +827,10 @@ Section correctness.
     simpl in *.
     rewrite H8 in *.
     rewrite H5 in *.
-    specialize (H7 (ex_intro _ _ (refl_equal _))).
-    specialize (H4 (ex_intro _ _ (refl_equal _))); subst.
-    red in H3.
-
+    subst.
     eapply smem_write_correct' in H3; eauto.
     destruct H3; intuition.
-    rewrite H7; assumption.
+    rewrite H7. assumption.
   Qed.
 End correctness.
 
