@@ -231,7 +231,7 @@ Definition smem_write stn := SepIL.smem_write_word stn.
 (** Symbolic Execution **)
 (************************)
 Require Import ReifyIL.
-Lemma Some_cong : forall A (x y : A),
+Lemma Some_cong : forall (x y : W),
   x = y
   -> Some x = Some y.
   congruence.
