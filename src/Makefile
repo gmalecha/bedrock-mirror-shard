@@ -7,7 +7,6 @@ MODULES    := Tactics ListFacts \
 	Memory \
 	XCAP Structured StructuredModule Linker Programming \
 	SepTheoryPropX \
-	NatMap \
 	Provers \
 	$(PROVERS:%=provers/%Prover) \
 	$(SEP:%=sep/%) \
